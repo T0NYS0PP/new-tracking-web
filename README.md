@@ -28,6 +28,12 @@ Head tracking needs a secure context: `localhost` is fine, anything else must be
 | `npm run assets` | Download `public/mediapipe/face_landmarker.task` and `public/splats/hero.spz` |
 | `npm run typecheck` | `tsc --noEmit` |
 
+## Making the scene in Unreal Engine
+
+`docs/unreal-pipeline.md` (Japanese) walks through exporting a training dataset from an Unreal level with
+`tools/unreal/ue_export_splat_dataset.py`, checking it with `node scripts/check-dataset.mjs <dir>`, training
+a splat (PostShot or Nerfstudio), cleaning it in SuperSplat and dropping the `.spz` into the hero.
+
 ## Swapping in your own splat
 
 1. Export a `.spz` or `.sog` (PlayCanvas SuperSplat can clean, crop and convert `.ply`).

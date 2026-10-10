@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
+import { SparkRenderer, SplatMesh, type SplatFileType } from '@sparkjsdev/spark';
 import { config } from '../config';
 import { ViewerCamera } from '../camera/ViewerCamera';
 
@@ -50,10 +50,15 @@ export class HeroScene {
     this.resize();
   }
 
-  async load(url = config.splat.url): Promise<void> {
+  /**
+   * @param fileType forced when the host serves the splat under a foreign extension
+   *                 (the artifact viewer only serves .wasm-style binaries, for instance).
+   */
+  async load(url = config.splat.url, fileType?: SplatFileType): Promise<void> {
     const s = config.splat;
     const mesh = new SplatMesh({
       url: new URL(url, document.baseURI).href,
+      fileType,
       onProgress: (e) => {
         if (e.lengthComputable && e.total > 0) this.events.onProgress?.(e.loaded / e.total);
       },

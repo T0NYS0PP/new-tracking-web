@@ -2,7 +2,9 @@
 //  - dist-artifact/index.html : a page *fragment* (title + inline style + markup + module script)
 //  - dist-artifact/files.json : published path -> source file map for the supporting files
 // The artifact viewer cannot use the camera, so the MediaPipe bundle is left out; the lighter
-// SH-degree-1 splat keeps the file under the 15 MB per-file limit.
+// SH-degree-1 splat keeps the file under the 15 MB per-file limit. The artifact store only serves
+// known extensions, so the .spz bytes are published under a .wasm name and the page tells Spark
+// the real file type through data attributes on the canvas.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,7 +25,14 @@ const scripts = [...html.matchAll(/<script[^>]*type="module"[^>]*><\/script>/g)]
 if (scripts.length === 0) throw new Error('dist/index.html has no module script');
 // Drop leading "./" so paths are plain relative references next to the page.
 const relativize = (str) => str.replace(/(src|href)="\.\/(assets\/)/g, '$1="$2');
-const markup = relativize(body).trim() + '\n' + scripts.map(relativize).join('\n');
+const SPLAT_PATH = 'splats/hero.spz.wasm';
+const markup =
+  relativize(body)
+    .replace('<canvas id="hero-canvas"', `<canvas id="hero-canvas" data-splat="${SPLAT_PATH}" data-splat-type="spz"`)
+    .trim() +
+  '\n' +
+  scripts.map(relativize).join('\n');
+if (!markup.includes('data-splat=')) throw new Error('could not inject the splat override into the canvas');
 
 const fragment = [
   '<title>Boring Window</title>',
@@ -41,7 +50,7 @@ for (const name of readdirSync(resolve(dist, 'assets'))) {
 }
 const lite = resolve(root, 'public/splats/hero-lite.spz');
 if (!existsSync(lite)) throw new Error('public/splats/hero-lite.spz missing: run `npm run assets`');
-files['splats/hero.spz'] = { from: 'public/splats/hero-lite.spz', contentType: 'application/octet-stream' };
+files[SPLAT_PATH] = { from: 'public/splats/hero-lite.spz', contentType: 'application/wasm' };
 writeFileSync(resolve(out, 'files.json'), JSON.stringify(files, null, 2));
 
 console.log(`[artifact] wrote ${out}/index.html (${(fragment.length / 1024).toFixed(0)} KB) and files.json:`);

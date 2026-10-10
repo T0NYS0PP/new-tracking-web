@@ -6,6 +6,7 @@ import { OrientationInput } from './input/OrientationInput';
 import { CENTER_POSE, type HeadPose, type InputSource } from './input/types';
 import { HeroOverlay } from './ui/HeroOverlay';
 import type { HeadTracker } from './tracking/HeadTracker';
+import type { SplatFileType } from '@sparkjsdev/spark';
 
 const overlay = new HeroOverlay();
 const canvas = document.querySelector<HTMLCanvasElement>('#hero-canvas');
@@ -127,8 +128,11 @@ async function boot(canvas: HTMLCanvasElement): Promise<void> {
   (window as unknown as { __hero: unknown }).__hero = { scene, pointer, switchTo, config, getTracker };
 
   // --- Splat ---
+  // Hosts may override the asset location via data attributes on the canvas (see scripts/build-artifact.mjs).
+  const splatUrl = canvas.dataset.splat ?? config.splat.url;
+  const splatType = canvas.dataset.splatType as SplatFileType | undefined;
   try {
-    await scene.load(config.splat.url);
+    await scene.load(splatUrl, splatType);
   } catch {
     overlay.setLoaderMessage('Could not load the scene. Run `npm run assets` and refresh.');
     return;

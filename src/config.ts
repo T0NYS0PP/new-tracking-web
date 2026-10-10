@@ -1,0 +1,76 @@
+/** All tunables for the hero in one place. Numbers are world units unless stated. */
+export const config = {
+  splat: {
+    /** Served from public/splats (downloaded by `npm run assets`). */
+    url: '/splats/hero.spz',
+    /** Orientation / placement of the loaded splat inside the scene. */
+    position: [0, -0.3, -0.6] as [number, number, number],
+    /** Euler XYZ in radians. Many .ply captures are y-down and need a [Math.PI, 0, 0] flip; the sample .spz does not. */
+    rotation: [0, 0, 0] as [number, number, number],
+    scale: 1,
+  },
+
+  camera: {
+    /** Virtual "window" size in world units at z = 0 (aspect is corrected at runtime). */
+    windowWidth: 3.2,
+    /** Baseline eye distance from the window plane. */
+    baseDistance: 2.6,
+    near: 0.05,
+    far: 100,
+    /** Lateral / vertical translation per unit of head offset (off-axis part). */
+    kx: 0.6,
+    ky: 0.4,
+    /** Extra orbit around the pivot (exaggeration seen in the reference reel), in radians. */
+    maxYaw: (20 * Math.PI) / 180,
+    maxPitch: (10 * Math.PI) / 180,
+    /** Point the orbit rotates around (world units, in front of the window plane). */
+    pivot: [0, 0, -2.5] as [number, number, number],
+    /** Depth response: how much z moves the eye toward / away from the window. */
+    depthGain: 0.8,
+    /** Smoothing toward the target pose (1 - e^(-dt * rate)). */
+    smoothingRate: 10,
+    /** Pixel-ratio cap for performance. */
+    maxPixelRatio: 1.5,
+  },
+
+  tracking: {
+    wasmPath: '/mediapipe/wasm',
+    modelPath: '/mediapipe/face_landmarker.task',
+    /** Fallback if the model is not self-hosted. */
+    modelFallbackUrl:
+      'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+    video: { width: 640, height: 480, frameRate: 30 },
+    /** Upper bound for inference; decoupled from the render loop. */
+    maxFps: 30,
+    /** Mirror horizontal axis so moving right moves the view right. */
+    mirror: true,
+    /** Gain applied to normalised face offset before clamping. */
+    gainX: 2.8,
+    gainY: 2.8,
+    /** Dead zone around centre to kill micro jitter. */
+    deadZone: 0.02,
+    /** One Euro filter parameters. */
+    oneEuro: { minCutoff: 1.0, beta: 0.02, dCutoff: 1.0 },
+    /** Frames used to establish the inter-ocular baseline for depth estimation. */
+    calibrationFrames: 30,
+    /** Depth clamp. */
+    zMin: 0.6,
+    zMax: 1.6,
+    /** Face lost → pose confidence 0 after this many ms. */
+    lostAfterMs: 500,
+    storageKey: 'hero.headTracking',
+  },
+
+  pointer: {
+    gain: 1,
+    /** Pointer idle → slowly return to centre after this many ms. */
+    idleAfterMs: 2500,
+  },
+
+  orientation: {
+    /** Degrees of device tilt mapped to ±1. */
+    rangeDeg: 25,
+  },
+} as const;
+
+export type Config = typeof config;

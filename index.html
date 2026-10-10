@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="A deliberately boring website whose screen pretends to be a window. Head tracking + Gaussian splatting." />
+    <title>BORING — the most boring website you'll open today</title>
+  </head>
+  <body>
+    <main id="hero" class="hero" data-state="booting">
+      <canvas id="hero-canvas" class="hero__canvas" aria-hidden="true"></canvas>
+      <div class="hero__poster" aria-hidden="true"></div>
+      <div class="hero__shade" aria-hidden="true"></div>
+
+      <header class="hero__nav">
+        <a class="hero__logo" href="#">BORING</a>
+        <nav class="hero__links" aria-label="Primary">
+          <a href="#">Nothing</a>
+          <a href="#">Nowhere</a>
+          <a href="#">No one</a>
+        </nav>
+      </header>
+
+      <div class="hero__content">
+        <h1 class="hero__title">BORING</h1>
+        <div class="hero__aside">
+          <p class="hero__copy">
+            Honestly, the most boring website you'll open today. Nothing to buy, nothing to book,
+            nothing happens. Move your head and the screen pretends to be a window, which is, admittedly,
+            the only exciting thing here. Please lower your expectations accordingly.
+          </p>
+          <a class="hero__cta" href="#">Book a tour anyway <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+
+      <div class="hero__controls">
+        <button id="track-toggle" class="track-toggle" type="button" aria-pressed="false">
+          <span class="track-toggle__dot" aria-hidden="true"></span>
+          <span class="track-toggle__label">Look through the window</span>
+        </button>
+        <p id="track-status" class="track-status" role="status" aria-live="polite"></p>
+        <p class="hero__privacy">Camera frames are processed on this device only. Nothing is sent or stored.</p>
+      </div>
+
+      <div class="hero__loader" aria-live="polite">
+        <div class="hero__loader-bar"><span id="loader-fill"></span></div>
+        <p id="loader-text">Loading something boring…</p>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

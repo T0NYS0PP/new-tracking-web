@@ -202,3 +202,19 @@ tracking → lost-face(0.5s 以上検出なし)→ 1s かけて中央へ復帰
 
 - このクラウド環境では npm レジストリと `storage.googleapis.com`(MediaPipe モデル)へは到達できますが、`sparkjs.dev` と `cdn.jsdelivr.net` はブロックされています。そのため CDN import map ではなく **npm インストール + セルフホスト**で構成します。
 - 開発用 Splat をリモートから取得できないため、M1 では手続き的生成またはリポジトリに同梱した小さな .spz を使います。
+
+## 16. 決定事項と実装状況(2026-10-10)
+
+| 項目 | 決定 |
+|------|------|
+| カメラ権限 | ボタン開始(自動プロンプトなし)。一度許可した訪問者は次回、最初のクリック/キー操作で自動再開 |
+| フレームワーク | Vite 8 + vanilla TypeScript |
+| コピー | 仮置き: 見出し "BORING"、本文はセルフパロディ調、CTA "Book a tour anyway →" |
+| 開発用 Splat | Niantic の `spz` リポジトリのサンプル(hornedlizard.spz, 18MB)を `npm run assets` で取得。コミットはしない |
+| MediaPipe | WASM は `postinstall` で `public/mediapipe/wasm` にセルフホスト。モデルは `npm run assets` で取得(未取得時は Google の配信 URL にフォールバック) |
+
+実装済み(M1〜M4 相当): Spark 描画、off-axis + オービット合成カメラ、One Euro 平滑化、MediaPipe 頭部トラッキング(遅延読み込み)、マウス / ジャイロ / reduced-motion / WebGL2 なしのフォールバック、ローディングとポスター、可視性による停止、DPR 上限。
+
+**要件からの乖離(既知)**: 初期 JS は gzip 後およそ 1.0MB。内訳の大半は Spark 本体(Rust 製 WASM とワーカーを同梱)で、three.js とアプリ本体は 200KB 程度。§8 の 600KB 目標は Spark 採用時点で達成不能のため、実測値を基準に見直す。
+
+未着手(M5): 本番 Splat の差し替えと配置調整、スマホ用縮小アセットの出し分け、実機での性能計測、デプロイ。

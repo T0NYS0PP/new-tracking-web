@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Relative base: the same build works at the domain root, under /new-tracking-web/ (GitHub Pages)
+  // and inside the claude.ai artifact viewer.
+  base: './',
   server: {
     headers: {
       // Camera access and WASM threads behave best under a secure, isolated context.

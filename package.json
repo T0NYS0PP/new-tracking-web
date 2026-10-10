@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "assets": "node scripts/download-assets.mjs",
-    "postinstall": "node scripts/copy-mediapipe.mjs"
+    "postinstall": "node scripts/copy-mediapipe.mjs",
+    "build:artifact": "npm run build && node scripts/build-artifact.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.0",

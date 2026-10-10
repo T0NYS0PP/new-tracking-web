@@ -13,24 +13,34 @@ if (!canvas) throw new Error('Missing #hero-canvas');
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
-const trackerSupported =
+const cameraApiAvailable =
   window.isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function';
+const cameraAllowed = cameraApiAvailable && cameraAllowedByPolicy();
+const trackerSupported = cameraAllowed;
+const TRACKING_NOTE = cameraApiAvailable
+  ? 'Head tracking needs the camera, which this embedded view cannot use. Open the standalone page to try it.'
+  : 'Head tracking needs a camera over HTTPS. Mouse mode only here.';
 
 if (!HeroScene.isSupported()) {
   overlay.setState('unsupported');
   overlay.setTrackingSupported(false);
   overlay.setLoaderMessage('WebGL2 is not available. Enjoy the poster instead.');
+} else if (!wasmAllowed()) {
+  overlay.setState('unsupported');
+  overlay.setTrackingSupported(false);
+  overlay.setLoaderMessage('This host blocks WebAssembly, which the splat renderer needs. Open the standalone page.');
 } else {
-  boot(canvas).catch((err) => {
+  boot(canvas).catch((err: unknown) => {
     console.error('[hero] boot failed', err);
     overlay.setState('unsupported');
-    overlay.setLoaderMessage('The window would not open. Refresh to try again.');
+    const msg = err instanceof Error ? err.message : String(err);
+    overlay.setLoaderMessage(`The window would not open (${msg.slice(0, 120)}). Refresh to try again.`);
   });
 }
 
 async function boot(canvas: HTMLCanvasElement): Promise<void> {
   overlay.setState('loading');
-  overlay.setTrackingSupported(trackerSupported);
+  overlay.setTrackingSupported(trackerSupported, trackerSupported ? undefined : TRACKING_NOTE);
 
   // --- Scene ---
   const scene = new HeroScene(canvas, {
@@ -153,6 +163,30 @@ async function boot(canvas: HTMLCanvasElement): Promise<void> {
     },
     { threshold: 0.05 },
   ).observe(canvas);
+}
+
+/** Inside a frame without `allow="camera"` getUserMedia is refused without a prompt; detect that up front. */
+function cameraAllowedByPolicy(): boolean {
+  type Policy = { allowsFeature(feature: string): boolean };
+  const doc = document as Document & { featurePolicy?: Policy; permissionsPolicy?: Policy };
+  const policy = doc.permissionsPolicy ?? doc.featurePolicy;
+  if (!policy || typeof policy.allowsFeature !== 'function') return true;
+  try {
+    return policy.allowsFeature('camera');
+  } catch {
+    return true;
+  }
+}
+
+/** A CSP without 'wasm-unsafe-eval' makes WebAssembly compilation throw synchronously. */
+function wasmAllowed(): boolean {
+  try {
+    // Smallest valid module: magic + version.
+    new WebAssembly.Module(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function safeStore(value: boolean): void {

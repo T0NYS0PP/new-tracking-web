@@ -53,7 +53,7 @@ export class HeroScene {
   async load(url = config.splat.url): Promise<void> {
     const s = config.splat;
     const mesh = new SplatMesh({
-      url,
+      url: new URL(url, document.baseURI).href,
       onProgress: (e) => {
         if (e.lengthComputable && e.total > 0) this.events.onProgress?.(e.loaded / e.total);
       },

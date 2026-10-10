@@ -55,6 +55,20 @@ scripts/
   download-assets.mjs     fetch dev assets
 ```
 
+## Deploying
+
+**GitHub Pages (full experience, camera works).** `.github/workflows/deploy-pages.yml` builds the site
+and publishes `dist/` on every push to the default branch. One-time setup in the repository:
+Settings → Pages → Build and deployment → Source: **GitHub Actions**. The site then lives at
+`https://t0nys0pp.github.io/new-tracking-web/`.
+
+**claude.ai Artifact (preview, mouse parallax only).** `npm run build:artifact` writes
+`dist-artifact/index.html` (a page fragment) and `dist-artifact/files.json` (supporting files). The artifact
+viewer has no camera permission, so the page shows a note instead of the tracking toggle there.
+
+The build uses a relative `base`, so the same `dist/` works at a domain root, under a sub-path, or
+in the artifact viewer.
+
 ## Debugging
 
 `window.__hero` exposes `scene`, `pointer`, `switchTo`, `config` and `getTracker()` in the console.

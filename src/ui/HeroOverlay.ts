@@ -24,8 +24,15 @@ export class HeroOverlay {
     this.root.dataset.state = state;
   }
 
-  setTrackingSupported(supported: boolean): void {
+  /** @param note shown instead of the toggle when tracking cannot work in this context. */
+  setTrackingSupported(supported: boolean, note?: string): void {
     this.root.dataset.trackingSupported = String(supported);
+    if (!supported && note) {
+      this.root.dataset.trackingNote = 'true';
+      this.status.textContent = note;
+    } else {
+      delete this.root.dataset.trackingNote;
+    }
   }
 
   setProgress(fraction: number): void {

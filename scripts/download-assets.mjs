@@ -2,6 +2,7 @@
 //  - MediaPipe Face Landmarker model (float16)
 //  - A sample Gaussian splat (.spz) from the Niantic spz repository
 // Usage: node scripts/download-assets.mjs
+import { execFileSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Readable } from 'node:stream';
@@ -33,4 +34,12 @@ for (const { url, dest } of ASSETS) {
   if (!res.ok || !res.body) throw new Error(`Failed ${url}: ${res.status}`);
   await pipeline(Readable.fromWeb(res.body), createWriteStream(out));
   console.log(`[assets] saved    ${dest} (${(statSync(out).size / 1e6).toFixed(1)} MB)`);
+}
+
+// Lighter variant (SH degree 1, ~13 MB) for hosts with per-file size limits such as the artifact viewer.
+const lite = resolve(root, 'public/splats/hero-lite.spz');
+if (!existsSync(lite)) {
+  execFileSync(process.execPath, [resolve(root, 'scripts/spz-lite.mjs'), resolve(root, 'public/splats/hero.spz'), lite, '--sh', '1'], {
+    stdio: 'inherit',
+  });
 }

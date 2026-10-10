@@ -1,8 +1,13 @@
+/** Resolve a public/ asset against the page URL (works with Vite's relative base and in workers). */
+export function assetUrl(path: string): string {
+  return new URL(import.meta.env.BASE_URL + path, document.baseURI).href;
+}
+
 /** All tunables for the hero in one place. Numbers are world units unless stated. */
 export const config = {
   splat: {
     /** Served from public/splats (downloaded by `npm run assets`). */
-    url: '/splats/hero.spz',
+    url: assetUrl('splats/hero.spz'),
     /** Orientation / placement of the loaded splat inside the scene. */
     position: [0, -0.3, -0.6] as [number, number, number],
     /** Euler XYZ in radians. Many .ply captures are y-down and need a [Math.PI, 0, 0] flip; the sample .spz does not. */
@@ -34,8 +39,8 @@ export const config = {
   },
 
   tracking: {
-    wasmPath: '/mediapipe/wasm',
-    modelPath: '/mediapipe/face_landmarker.task',
+    wasmPath: assetUrl('mediapipe/wasm'),
+    modelPath: assetUrl('mediapipe/face_landmarker.task'),
     /** Fallback if the model is not self-hosted. */
     modelFallbackUrl:
       'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',

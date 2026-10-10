@@ -3,15 +3,41 @@ import { config } from '../config';
 import { CENTER_POSE, type HeadPose, type InputSource, type PoseListener } from '../input/types';
 import { OneEuroFilter } from './OneEuroFilter';
 
-export type TrackerStatus = 'idle' | 'loading' | 'tracking' | 'lost' | 'denied' | 'error';
+export type TrackerStatus = 'idle' | 'loading' | 'calibrating' | 'tracking' | 'lost' | 'denied' | 'error';
 export type StatusListener = (status: TrackerStatus, detail?: string) => void;
+export type EstimationMethod = 'matrix' | 'landmarks';
 
-const LEFT_IRIS = 468;
-const RIGHT_IRIS = 473;
+/** Metric estimate of the head position in camera space: x image-right, y up, z distance (all cm). */
+export interface HeadSample {
+  x: number;
+  y: number;
+  z: number;
+  t: number;
+  method: EstimationMethod;
+}
+
+export interface TrackerStats {
+  status: TrackerStatus;
+  fps: number;
+  inferenceMs: number;
+  raw: HeadSample | null;
+  neutral: { x: number; y: number; z: number } | null;
+  pose: HeadPose;
+  video: { width: number; height: number } | null;
+}
+
+// Face mesh indices (478-point topology with iris refinement).
+const EYE_CORNERS = [33, 133, 362, 263] as const;
+const LEFT_IRIS = { h: [469, 471], v: [470, 472] } as const;
+const RIGHT_IRIS = { h: [474, 476], v: [475, 477] } as const;
+const MIN_LANDMARKS = 478;
 
 /**
  * Webcam head tracker built on MediaPipe Face Landmarker.
- * Everything runs on-device; frames never leave the browser.
+ *
+ * Position is estimated in centimetres (facial transformation matrix by default, pinhole + iris
+ * size as a fallback), made relative to an automatically captured neutral pose, normalised to the
+ * configured travel range and smoothed with a One Euro filter. Everything runs on-device.
  */
 export class HeadTracker implements InputSource {
   readonly name = 'head';
@@ -23,29 +49,31 @@ export class HeadTracker implements InputSource {
   private running = false;
   private rafHandle = 0;
   private vfcHandle = 0;
+  private status: TrackerStatus = 'idle';
+
   private lastInferenceTs = 0;
   private lastSeenTs = 0;
   private lostEmitted = false;
-  private status: TrackerStatus = 'idle';
+  private lostSince = 0;
 
-  private fx = new OneEuroFilter(
-    config.tracking.oneEuro.minCutoff,
-    config.tracking.oneEuro.beta,
-    config.tracking.oneEuro.dCutoff,
-  );
-  private fy = new OneEuroFilter(
-    config.tracking.oneEuro.minCutoff,
-    config.tracking.oneEuro.beta,
-    config.tracking.oneEuro.dCutoff,
-  );
-  private fz = new OneEuroFilter(
-    config.tracking.oneEuro.minCutoff * 0.6,
-    config.tracking.oneEuro.beta,
-    config.tracking.oneEuro.dCutoff,
-  );
+  private calibration: HeadSample[] = [];
+  private neutral: { x: number; y: number; z: number } | null = null;
+  private lastSample: HeadSample | null = null;
+  private lastPose: HeadPose = { ...CENTER_POSE };
+  private fpsEma = 0;
+  private inferEma = 0;
 
-  private calibSamples: number[] = [];
-  private baselineEyeDist: number | null = null;
+  private fx: OneEuroFilter;
+  private fy: OneEuroFilter;
+  private fz: OneEuroFilter;
+
+  constructor() {
+    const { minCutoff, beta, dCutoff } = config.tracking.oneEuro;
+    this.fx = new OneEuroFilter(minCutoff, beta, dCutoff);
+    this.fy = new OneEuroFilter(minCutoff, beta, dCutoff);
+    // Depth is noisier than lateral position: smooth it a little harder.
+    this.fz = new OneEuroFilter(minCutoff * 0.6, beta * 0.5, dCutoff);
+  }
 
   static isSupported(): boolean {
     return (
@@ -70,18 +98,32 @@ export class HeadTracker implements InputSource {
     return this.status;
   }
 
+  getStats(): TrackerStats {
+    return {
+      status: this.status,
+      fps: this.fpsEma,
+      inferenceMs: this.inferEma,
+      raw: this.lastSample,
+      neutral: this.neutral,
+      pose: this.lastPose,
+      video: this.video ? { width: this.video.videoWidth, height: this.video.videoHeight } : null,
+    };
+  }
+
   async start(): Promise<void> {
     if (this.running) return;
     this.setStatus('loading');
+    const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+    const wanted = coarse ? config.tracking.mobileVideo : config.tracking.video;
     try {
       // Request the camera first: the permission prompt is the slow, user-facing step.
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           facingMode: 'user',
-          width: { ideal: config.tracking.video.width },
-          height: { ideal: config.tracking.video.height },
-          frameRate: { ideal: config.tracking.video.frameRate },
+          width: { ideal: wanted.width },
+          height: { ideal: wanted.height },
+          frameRate: { ideal: wanted.frameRate },
         },
       });
     } catch (err) {
@@ -97,9 +139,10 @@ export class HeadTracker implements InputSource {
       this.landmarker ??= await loadLandmarker();
 
       this.running = true;
-      this.resetFilters();
+      this.recalibrate(false);
       this.lastSeenTs = performance.now();
       this.lostEmitted = false;
+      this.lostSince = 0;
       this.setStatus('lost');
       this.scheduleNext();
     } catch (err) {
@@ -135,6 +178,18 @@ export class HeadTracker implements InputSource {
     }
   }
 
+  /** Forget the neutral pose; the next frames define a new "looking straight at the screen". */
+  recalibrate(announce = true): void {
+    this.calibration = [];
+    this.neutral = null;
+    this.lastSample = null;
+    this.fx.reset();
+    this.fy.reset();
+    this.fz.reset();
+    this.emit(CENTER_POSE);
+    if (announce && this.running) this.setStatus('calibrating');
+  }
+
   private scheduleNext(): void {
     if (!this.running || !this.video) return;
     const v = this.video as HTMLVideoElement & {
@@ -151,7 +206,11 @@ export class HeadTracker implements InputSource {
     if (!this.running || !this.video || !this.landmarker) return;
     const now = performance.now();
     const minInterval = 1000 / config.tracking.maxFps;
-    if (now - this.lastInferenceTs >= minInterval && this.video.readyState >= 2) {
+    if (now - this.lastInferenceTs >= minInterval - 1 && this.video.readyState >= 2) {
+      if (this.lastInferenceTs) {
+        const inst = 1000 / (now - this.lastInferenceTs);
+        this.fpsEma = this.fpsEma ? this.fpsEma * 0.9 + inst * 0.1 : inst;
+      }
       this.lastInferenceTs = now;
       let result: FaceLandmarkerResult | null = null;
       try {
@@ -159,73 +218,125 @@ export class HeadTracker implements InputSource {
       } catch (err) {
         console.warn('[HeadTracker] inference failed', err);
       }
+      const cost = performance.now() - now;
+      this.inferEma = this.inferEma ? this.inferEma * 0.9 + cost * 0.1 : cost;
       this.handleResult(result, now);
     }
     this.scheduleNext();
   }
 
   private handleResult(result: FaceLandmarkerResult | null, now: number): void {
-    const face = result?.faceLandmarks?.[0];
-    if (!face || face.length <= RIGHT_IRIS) {
+    const sample = result ? this.estimate(result, now) : null;
+
+    if (!sample) {
       if (!this.lostEmitted && now - this.lastSeenTs > config.tracking.lostAfterMs) {
         this.lostEmitted = true;
-        this.resetFilters();
+        this.lostSince = now;
+        this.fx.reset();
+        this.fy.reset();
+        this.fz.reset();
+        this.lastSample = null;
         this.emit(CENTER_POSE);
         this.setStatus('lost');
       }
       return;
     }
 
-    this.lastSeenTs = now;
-    if (this.lostEmitted || this.status !== 'tracking') {
+    // Glitch rejection: a face cannot teleport between consecutive frames.
+    if (this.lastSample && now - this.lastSample.t < 200) {
+      const jump = Math.hypot(sample.x - this.lastSample.x, sample.y - this.lastSample.y, sample.z - this.lastSample.z);
+      if (jump > config.tracking.maxJumpCm) return;
+    }
+
+    if (this.lostEmitted) {
       this.lostEmitted = false;
-      this.setStatus('tracking');
+      // Away for long enough that the viewer probably sat down somewhere else: re-centre.
+      if (this.neutral && now - this.lostSince > config.tracking.recalibrateAfterLostMs) this.recalibrate(false);
     }
+    this.lastSeenTs = now;
+    this.lastSample = sample;
 
-    const l = face[LEFT_IRIS];
-    const r = face[RIGHT_IRIS];
-    const aspect = this.video ? this.video.videoWidth / Math.max(1, this.video.videoHeight) : 4 / 3;
-
-    // Mid-point between the irises, normalised to [-1, 1] about the frame centre.
-    const mx = (l.x + r.x) / 2;
-    const my = (l.y + r.y) / 2;
-    let nx = (mx - 0.5) * 2 * config.tracking.gainX;
-    let ny = -(my - 0.5) * 2 * config.tracking.gainY;
-    if (config.tracking.mirror) nx = -nx;
-
-    // Depth from the apparent inter-ocular distance (aspect-corrected).
-    const dx = (l.x - r.x) * aspect;
-    const dy = l.y - r.y;
-    const eyeDist = Math.hypot(dx, dy);
-    let nz = 1;
-    if (this.baselineEyeDist === null) {
-      this.calibSamples.push(eyeDist);
-      if (this.calibSamples.length >= config.tracking.calibrationFrames) {
-        const sorted = [...this.calibSamples].sort((a, b) => a - b);
-        this.baselineEyeDist = sorted[Math.floor(sorted.length / 2)];
-      }
-    } else if (eyeDist > 1e-4) {
-      nz = this.baselineEyeDist / eyeDist;
+    if (!this.neutral) {
+      this.calibration.push(sample);
+      if (this.status !== 'calibrating') this.setStatus('calibrating');
+      if (this.calibration.length < config.tracking.calibrationFrames) return;
+      this.neutral = {
+        x: median(this.calibration.map((s) => s.x)),
+        y: median(this.calibration.map((s) => s.y)),
+        z: median(this.calibration.map((s) => s.z)),
+      };
+      this.calibration = [];
     }
+    if (this.status !== 'tracking') this.setStatus('tracking');
 
-    nx = deadZone(nx, config.tracking.deadZone);
-    ny = deadZone(ny, config.tracking.deadZone);
+    const t = config.tracking;
+    let nx = (sample.x - this.neutral.x) / t.lateralRangeCm;
+    if (t.mirror) nx = -nx;
+    let ny = (sample.y - this.neutral.y) / t.verticalRangeCm;
+    const nz = sample.z / Math.max(1, this.neutral.z);
 
-    const t = now / 1000;
-    this.emit({
-      x: clamp(this.fx.filter(nx, t), -1, 1),
-      y: clamp(this.fy.filter(ny, t), -1, 1),
-      z: clamp(this.fz.filter(nz, t), config.tracking.zMin, config.tracking.zMax),
+    nx = deadZone(nx, t.deadZone);
+    ny = deadZone(ny, t.deadZone);
+
+    const ts = now / 1000;
+    this.lastPose = {
+      x: clamp(this.fx.filter(nx, ts), -1, 1),
+      y: clamp(this.fy.filter(ny, ts), -1, 1),
+      z: clamp(this.fz.filter(nz, ts), t.zMin, t.zMax),
       confidence: 1,
-    });
+    };
+    this.emit(this.lastPose);
   }
 
-  private resetFilters(): void {
-    this.fx.reset();
-    this.fy.reset();
-    this.fz.reset();
-    this.calibSamples = [];
-    this.baselineEyeDist = null;
+  /** Metric head position from the landmarker output. */
+  private estimate(result: FaceLandmarkerResult, now: number): HeadSample | null {
+    const face = result.faceLandmarks?.[0];
+    if (!face || face.length < MIN_LANDMARKS || !this.video) return null;
+
+    if (config.tracking.method === 'matrix') {
+      // Column-major 4x4 pose of the canonical face model in camera space; translation in cm.
+      const m = result.facialTransformationMatrixes?.[0]?.data;
+      if (m && m.length === 16) {
+        const x = m[12];
+        const y = m[13];
+        const z = Math.abs(m[14]);
+        if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) && z > 5 && z < 400) {
+          return { x, y, z, t: now, method: 'matrix' };
+        }
+      }
+    }
+
+    // Fallback: pinhole camera with an assumed field of view, scaled by the near-constant human iris.
+    const W = this.video.videoWidth;
+    const H = this.video.videoHeight;
+    if (!W || !H) return null;
+    const f = W / 2 / Math.tan((config.tracking.assumedHfovDeg * Math.PI) / 360);
+    const px = (i: number) => ({ x: face[i].x * W, y: face[i].y * H });
+    const dist = (a: number, b: number) => {
+      const p = px(a);
+      const q = px(b);
+      return Math.hypot(p.x - q.x, p.y - q.y);
+    };
+    const dl = (dist(LEFT_IRIS.h[0], LEFT_IRIS.h[1]) + dist(LEFT_IRIS.v[0], LEFT_IRIS.v[1])) / 2;
+    const dr = (dist(RIGHT_IRIS.h[0], RIGHT_IRIS.h[1]) + dist(RIGHT_IRIS.v[0], RIGHT_IRIS.v[1])) / 2;
+    const diam = Math.max(dl, dr); // the eye facing the camera more squarely reads larger
+    if (diam < 2) return null;
+    const z = (f * config.tracking.irisDiameterCm) / diam;
+
+    let mx = 0;
+    let my = 0;
+    for (const i of EYE_CORNERS) {
+      const p = px(i);
+      mx += p.x / EYE_CORNERS.length;
+      my += p.y / EYE_CORNERS.length;
+    }
+    return {
+      x: ((mx - W / 2) * z) / f,
+      y: (-(my - H / 2) * z) / f,
+      z,
+      t: now,
+      method: 'landmarks',
+    };
   }
 
   private releaseCamera(): void {
@@ -239,6 +350,7 @@ export class HeadTracker implements InputSource {
   }
 
   private emit(pose: HeadPose): void {
+    this.lastPose = pose;
     for (const l of this.listeners) l(pose);
   }
 
@@ -259,7 +371,10 @@ async function loadLandmarker(): Promise<FaceLandmarker> {
     runningMode: 'VIDEO' as const,
     numFaces: 1,
     outputFaceBlendshapes: false,
-    outputFacialTransformationMatrixes: false,
+    outputFacialTransformationMatrixes: true,
+    minFaceDetectionConfidence: 0.5,
+    minFacePresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
   };
   try {
     return await FaceLandmarker.createFromOptions(vision, options);
@@ -299,6 +414,12 @@ function createHiddenVideo(): HTMLVideoElement {
   } satisfies Partial<CSSStyleDeclaration>);
   document.body.appendChild(video);
   return video;
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

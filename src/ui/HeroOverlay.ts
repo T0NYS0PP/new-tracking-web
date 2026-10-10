@@ -5,6 +5,7 @@ export type HeroState = 'booting' | 'loading' | 'ready' | 'tracking' | 'unsuppor
 const STATUS_TEXT: Record<TrackerStatus, string> = {
   idle: 'Mouse mode. Enable the camera to use your head instead.',
   loading: 'Waking up the camera…',
+  calibrating: 'Hold still for a moment…',
   tracking: 'Tracking your head. Lean left, right, closer.',
   lost: 'Looking for a face… step into the frame.',
   denied: 'Camera blocked. Mouse mode it is.',
@@ -17,6 +18,8 @@ export class HeroOverlay {
   private toggle = must<HTMLButtonElement>('#track-toggle');
   private toggleLabel = must<HTMLElement>('#track-toggle .track-toggle__label');
   private status = must<HTMLElement>('#track-status');
+  private recenter = must<HTMLButtonElement>('#track-recenter');
+  private debug = must<HTMLElement>('#debug-panel');
   private loaderFill = must<HTMLElement>('#loader-fill');
   private loaderText = must<HTMLElement>('#loader-text');
 
@@ -49,11 +52,24 @@ export class HeroOverlay {
     this.toggle.addEventListener('click', handler);
   }
 
+  onRecenter(handler: () => void): void {
+    this.recenter.addEventListener('click', handler);
+  }
+
+  setDebugVisible(visible: boolean): void {
+    this.debug.hidden = !visible;
+  }
+
+  setDebugText(text: string): void {
+    this.debug.textContent = text;
+  }
+
   setTrackerStatus(status: TrackerStatus, detail?: string): void {
-    const on = status === 'tracking' || status === 'lost' || status === 'loading';
+    const on = status === 'tracking' || status === 'lost' || status === 'loading' || status === 'calibrating';
     this.toggle.setAttribute('aria-pressed', String(on));
     this.toggle.dataset.status = status;
     this.toggle.disabled = status === 'loading';
+    this.recenter.hidden = !(status === 'tracking' || status === 'lost' || status === 'calibrating');
     this.toggleLabel.textContent = on ? 'Stop looking' : 'Look through the window';
     this.status.textContent = STATUS_TEXT[status];
     if (detail) this.status.title = detail;

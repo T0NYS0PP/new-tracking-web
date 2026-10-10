@@ -95,11 +95,14 @@ tracking → lost-face(0.5s 以上検出なし)→ 1s かけて中央へ復帰
 
 | 項目 | 仕様 |
 |------|------|
-| カメラ取得 | `getUserMedia({ video: { facingMode: 'user', width: 640, height: 480, frameRate: 30 } })`。`<video>` は非表示(`display:none` ではなく画面外配置、iOS は `playsinline` 必須) |
-| 推論設定 | `FaceLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath, delegate: 'GPU' }, runningMode: 'VIDEO', numFaces: 1, outputFacialTransformationMatrixes: true })` |
+| カメラ取得 | デスクトップは 1280×720、スマホは 640×480 を要求(`getUserMedia`、facingMode user、30fps)。`<video>` は非表示(`display:none` ではなく画面外配置、iOS は `playsinline` 必須) |
+| 推論設定 | `FaceLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath, delegate: 'GPU' }, runningMode: 'VIDEO', numFaces: 1, outputFacialTransformationMatrixes: true })`。GPU 不可時は CPU delegate に自動フォールバック |
 | 推論ループ | render loop とは分離し 30fps 上限。`requestVideoFrameCallback` があれば使用。`detectForVideo(video, timestamp)` |
-| 位置推定 | 横・縦: 両目(虹彩ランドマーク 468 / 473)の中点を画面中心基準で [-1,1] に正規化、左右は鏡像反転。奥行き: 両目間ピクセル距離(基準値との比)で近接度を算出。精度が必要なら `facialTransformationMatrixes` の平行移動成分を使用 |
-| 平滑化 | One Euro Filter(minCutoff ≈ 1.0, beta ≈ 0.02, dCutoff ≈ 1.0)。小さなデッドゾーン(±0.02)でノイズ除去 |
+| 位置推定(v2) | 既定は `facialTransformationMatrixes` の平行移動成分(顔全体のフィット、cm 単位)で頭の位置をメートル系で推定。代替として眼角 4 点の中点 + 虹彩径(約 11.7mm、個人差が小さい)によるピンホール推定(`method: 'landmarks'`、水平画角を仮定)。視線移動の影響を受けず、距離が変わっても横移動の感度が一定になる |
+| ニュートラル較正 | 追跡開始時の 20 フレームの中央値をニュートラル姿勢とし、以降は相対位置を `lateralRangeCm` / `verticalRangeCm`(±22 / ±14cm)で [-1,1] に正規化。R キー / Recenter ボタンで再較正。5 秒以上ロスト後の再検出時は自動再較正 |
+| 外れ値除去 | 連続フレーム間で 40cm を超える推定の飛びは棄却 |
+| 遅延補償 | 描画側でフィルタ済み姿勢を速度外挿(既定 70ms)し、カメラ + 推論の遅延を隠す。頭部入力時は描画側の平滑化を弱める(二重平滑化の回避) |
+| 平滑化 | One Euro Filter(正規化単位で minCutoff ≈ 1.0, beta ≈ 0.4, dCutoff ≈ 1.0、奥行きはやや強め)。デッドゾーン ±0.01 |
 | クランプ | x,y を ±1、z を [0.6, 1.6] に制限。振幅が大きすぎると酔うため、カメラ移動量は最大 ±0.35 ワールド単位程度に抑える |
 | ロスト処理 | 顔未検出が 500ms 続いたら中央へイージング復帰。再検出時はジャンプせずフィルタで追従 |
 | 省電力 | `visibilitychange` で非表示時は停止、HERO が `IntersectionObserver` で画面外になったら推論を停止 |

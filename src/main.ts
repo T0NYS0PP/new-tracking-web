@@ -66,6 +66,11 @@ async function boot(canvas: HTMLCanvasElement): Promise<void> {
   };
   const switchTo = (source: InputSource) => {
     active = source;
+    scene.viewer.setResponse(
+      source.name === 'head'
+        ? { smoothingRate: config.camera.headSmoothingRate, predictMs: config.tracking.predictMs }
+        : { smoothingRate: config.camera.smoothingRate, predictMs: 0 },
+    );
     scene.viewer.setTarget(latest[source.name] ?? CENTER_POSE);
   };
   const fallbackSource = () => (orientation && latest[orientation.name] ? orientation : pointer);
@@ -85,9 +90,9 @@ async function boot(canvas: HTMLCanvasElement): Promise<void> {
     tracker.onPose(feed(tracker));
     tracker.onStatus((status, detail) => {
       overlay.setTrackerStatus(status, detail);
-      if (status === 'tracking' || status === 'lost') {
+      if (status === 'tracking' || status === 'lost' || status === 'calibrating') {
         if (splatReady) overlay.setState('tracking');
-        switchTo(tracker!);
+        if (active !== tracker) switchTo(tracker!);
       } else if (status === 'idle' || status === 'denied' || status === 'error') {
         if (splatReady) overlay.setState('ready');
         switchTo(fallbackSource());
@@ -113,6 +118,10 @@ async function boot(canvas: HTMLCanvasElement): Promise<void> {
 
   if (trackerSupported) {
     overlay.setTrackerStatus('idle');
+    overlay.onRecenter(() => tracker?.recalibrate());
+    window.addEventListener('keydown', (e) => {
+      if ((e.key === 'r' || e.key === 'R') && !e.metaKey && !e.ctrlKey && !e.altKey) tracker?.recalibrate();
+    });
     overlay.onToggle(() => {
       const s = tracker?.getStatus() ?? 'idle';
       if (s === 'idle' || s === 'denied' || s === 'error') {
@@ -126,6 +135,38 @@ async function boot(canvas: HTMLCanvasElement): Promise<void> {
 
   // Debug handle (used by the headless smoke test and handy in DevTools).
   (window as unknown as { __hero: unknown }).__hero = { scene, pointer, switchTo, config, getTracker };
+
+  // `?debug` / `#debug` shows the live tracker estimate to help tuning.
+  if (/\bdebug\b/.test(location.search) || /\bdebug\b/.test(location.hash)) {
+    overlay.setDebugVisible(true);
+    let frames = 0;
+    let lastFpsAt = performance.now();
+    let renderFps = 0;
+    const countFrame = () => {
+      frames++;
+      const now = performance.now();
+      if (now - lastFpsAt >= 1000) {
+        renderFps = (frames * 1000) / (now - lastFpsAt);
+        frames = 0;
+        lastFpsAt = now;
+      }
+      requestAnimationFrame(countFrame);
+    };
+    requestAnimationFrame(countFrame);
+    window.setInterval(() => {
+      const st = tracker?.getStats();
+      const f = (v: number, d = 1) => (v >= 0 ? '+' : '') + v.toFixed(d);
+      const lines = [
+        `input   ${active.name}   render ${renderFps.toFixed(0)} fps`,
+        st ? `tracker ${st.status}   ${st.fps.toFixed(1)} fps   infer ${st.inferenceMs.toFixed(1)} ms   cam ${st.video?.width ?? '?'}x${st.video?.height ?? '?'}` : 'tracker not started',
+        st?.raw ? `raw     ${st.raw.method}  x ${f(st.raw.x)}  y ${f(st.raw.y)}  z ${st.raw.z.toFixed(1)} cm` : 'raw     -',
+        st?.neutral ? `neutral x ${f(st.neutral.x)}  y ${f(st.neutral.y)}  z ${st.neutral.z.toFixed(1)} cm` : 'neutral -',
+        st ? `pose    x ${f(st.pose.x, 2)}  y ${f(st.pose.y, 2)}  z ${st.pose.z.toFixed(2)}` : '',
+        `tuning  range ${config.tracking.lateralRangeCm}/${config.tracking.verticalRangeCm} cm  predict ${config.tracking.predictMs} ms  euro ${config.tracking.oneEuro.minCutoff}/${config.tracking.oneEuro.beta}`,
+      ];
+      overlay.setDebugText(lines.join('\n'));
+    }, 200);
+  }
 
   // --- Splat ---
   // Hosts may override the asset location via data attributes on the canvas (see scripts/build-artifact.mjs).

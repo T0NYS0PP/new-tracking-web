@@ -69,6 +69,27 @@ viewer has no camera permission, so the page shows a note instead of the trackin
 The build uses a relative `base`, so the same `dist/` works at a domain root, under a sub-path, or
 in the artifact viewer.
 
+## Tuning head-tracking accuracy
+
+The tracker estimates the head position in centimetres (MediaPipe's facial transformation matrix by
+default, or a pinhole + iris-size model with `method: 'landmarks'`), subtracts a neutral pose captured
+over the first frames (median), normalises by `lateralRangeCm` / `verticalRangeCm`, smooths with a One
+Euro filter and lets the camera extrapolate `predictMs` ahead to hide sensor latency. Everything lives in
+`config.tracking` in `src/config.ts`:
+
+| Symptom | Knob |
+|---|---|
+| Too little / too much movement | `lateralRangeCm`, `verticalRangeCm` (smaller = more sensitive) |
+| View inverted left/right | `mirror` |
+| Jitter at rest | lower `oneEuro.minCutoff` (0.6–1.0) or raise `deadZone` |
+| Feels laggy on fast moves | raise `oneEuro.beta` (0.3–1.0) or `predictMs` (50–100) |
+| Overshoots / wobbles | lower `predictMs`, lower `camera.headSmoothingRate` |
+| Neutral position feels off | press **R** or the Recenter button; `calibrationFrames` sets how long it samples |
+| Depth too strong / weak | `camera.depthGain` |
+
+Open the page with `?debug` (or `#debug`) to see the raw estimate, neutral pose, filtered pose, tracker
+and render frame rates live.
+
 ## Debugging
 
 `window.__hero` exposes `scene`, `pointer`, `switchTo`, `config` and `getTracker()` in the console.

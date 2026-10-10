@@ -32,8 +32,10 @@ export const config = {
     pivot: [0, 0, -2.5] as [number, number, number],
     /** Depth response: how much z moves the eye toward / away from the window. */
     depthGain: 0.8,
-    /** Smoothing toward the target pose (1 - e^(-dt * rate)). */
+    /** Smoothing toward the target pose (1 - e^(-dt * rate)) for pointer / tilt input. */
     smoothingRate: 10,
+    /** The webcam pose is already filtered, so the camera follows it more tightly. */
+    headSmoothingRate: 28,
     /** Pixel-ratio cap for performance. */
     maxPixelRatio: 1.5,
   },
@@ -44,20 +46,38 @@ export const config = {
     /** Fallback if the model is not self-hosted. */
     modelFallbackUrl:
       'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-    video: { width: 640, height: 480, frameRate: 30 },
+    /** Higher input resolution gives the landmark crop more detail (desktop). */
+    video: { width: 1280, height: 720, frameRate: 30 },
+    mobileVideo: { width: 640, height: 480, frameRate: 30 },
     /** Upper bound for inference; decoupled from the render loop. */
     maxFps: 30,
+    /**
+     * How the metric head position is estimated:
+     *  - 'matrix'    : MediaPipe's facial transformation matrix (whole-face fit, in cm). Default.
+     *  - 'landmarks' : pinhole model from eye corners + iris size (needs assumedHfovDeg).
+     */
+    method: 'matrix' as 'matrix' | 'landmarks',
+    /** Horizontal field of view assumed for the landmark fallback (typical laptop webcam 60-78°). */
+    assumedHfovDeg: 65,
+    /** Human iris diameter is remarkably constant; used for depth in the landmark fallback. */
+    irisDiameterCm: 1.17,
+    /** Head travel (relative to the neutral pose) that maps to the full ±1 range. */
+    lateralRangeCm: 22,
+    verticalRangeCm: 14,
     /** Mirror horizontal axis so moving right moves the view right. */
     mirror: true,
-    /** Gain applied to normalised face offset before clamping. */
-    gainX: 2.8,
-    gainY: 2.8,
-    /** Dead zone around centre to kill micro jitter. */
-    deadZone: 0.02,
-    /** One Euro filter parameters. */
-    oneEuro: { minCutoff: 1.0, beta: 0.02, dCutoff: 1.0 },
-    /** Frames used to establish the inter-ocular baseline for depth estimation. */
-    calibrationFrames: 30,
+    /** Dead zone around centre (normalised units) to kill micro jitter. */
+    deadZone: 0.01,
+    /** One Euro filter parameters in normalised units per second. */
+    oneEuro: { minCutoff: 1.0, beta: 0.4, dCutoff: 1.0 },
+    /** Frames used to capture the neutral pose when tracking starts (median). */
+    calibrationFrames: 20,
+    /** Reject a frame whose estimate jumps more than this from the previous one (cm). */
+    maxJumpCm: 40,
+    /** Face lost for longer than this and found again → capture a fresh neutral pose. */
+    recalibrateAfterLostMs: 5000,
+    /** Extrapolate the filtered pose this far ahead to hide camera + inference latency. */
+    predictMs: 70,
     /** Depth clamp. */
     zMin: 0.6,
     zMax: 1.6,

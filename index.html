@@ -35,13 +35,18 @@
       </div>
 
       <div class="hero__controls">
-        <button id="track-toggle" class="track-toggle" type="button" aria-pressed="false">
-          <span class="track-toggle__dot" aria-hidden="true"></span>
-          <span class="track-toggle__label">Look through the window</span>
-        </button>
+        <div class="hero__buttons">
+          <button id="track-toggle" class="track-toggle" type="button" aria-pressed="false">
+            <span class="track-toggle__dot" aria-hidden="true"></span>
+            <span class="track-toggle__label">Look through the window</span>
+          </button>
+          <button id="track-recenter" class="track-recenter" type="button" title="Capture the current head position as neutral (R)" hidden>Recenter</button>
+        </div>
         <p id="track-status" class="track-status" role="status" aria-live="polite"></p>
         <p class="hero__privacy">Camera frames are processed on this device only. Nothing is sent or stored.</p>
       </div>
+
+      <pre id="debug-panel" class="debug-panel" aria-hidden="true" hidden></pre>
 
       <div class="hero__loader" aria-live="polite">
         <div class="hero__loader-bar"><span id="loader-fill"></span></div>

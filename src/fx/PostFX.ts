@@ -33,11 +33,13 @@ export type FXPresetName = 'cinematic' | 'soft';
 const SUN: [number, number, number] = [1.0, 0.86, 0.6];
 
 export const FX_PRESETS: Record<FXPresetName, PostFXSettings> = {
+  // Ray energy is bounded: weight * (1 - decay^64) / (1 - decay) * exposure ≈ 0.56 when every
+  // sample along the march is fully bright, so bright skies glow instead of clipping to white.
   cinematic: {
-    rays: { density: 1.0, decay: 0.972, weight: 0.06, exposure: 0.85, threshold: 0.58, flicker: 0.14 },
-    sun: { glow: 0.55, radius: 0.42, haze: 0.28, color: SUN },
-    bloom: { strength: 0.35, radius: 0.55, threshold: 0.74 },
-    diffusion: { strength: 0.28, radius: 0.95, threshold: 0.22 },
+    rays: { density: 1.0, decay: 0.975, weight: 0.025, exposure: 0.7, threshold: 0.62, flicker: 0.12 },
+    sun: { glow: 0.3, radius: 0.4, haze: 0.16, color: SUN },
+    bloom: { strength: 0.3, radius: 0.5, threshold: 0.78 },
+    diffusion: { strength: 0.18, radius: 0.9, threshold: 0.35 },
     grade: {
       exposure: 1.0,
       contrast: 1.1,
@@ -47,13 +49,13 @@ export const FX_PRESETS: Record<FXPresetName, PostFXSettings> = {
       haze: [0.86, 0.78, 0.62],
       hazeAmount: 0.04,
       shadowTint: [0.35, 0.45, 0.65],
-      splitTone: 0.22,
-      saturation: 1.06,
+      splitTone: 0.2,
+      saturation: 1.05,
     },
   },
   soft: {
-    rays: { density: 0.9, decay: 0.965, weight: 0.04, exposure: 0.4, threshold: 0.72, flicker: 0.06 },
-    sun: { glow: 0.18, radius: 0.35, haze: 0.08, color: SUN },
+    rays: { density: 0.9, decay: 0.965, weight: 0.02, exposure: 0.4, threshold: 0.72, flicker: 0.06 },
+    sun: { glow: 0.12, radius: 0.35, haze: 0.06, color: SUN },
     bloom: { strength: 0.22, radius: 0.4, threshold: 0.82 },
     diffusion: { strength: 0.0, radius: 0.8, threshold: 0.3 },
     grade: {
@@ -129,7 +131,7 @@ const LightShader = {
       float dist = length(toLight * vec2(aspect, 1.0)) / aspect;
       float falloff = smoothstep(1.6, 0.0, dist);
       float shimmer = 0.9 + 0.1 * sin(time * 0.7 + vUv.x * 6.0) * sin(time * 0.45 + vUv.y * 5.0);
-      col += (acc * 0.6 + acc * sunColor * 0.6) * exposure * falloff * lightStrength * shimmer * breathe;
+      col += acc * mix(vec3(1.0), sunColor, 0.6) * exposure * falloff * lightStrength * shimmer * breathe;
 
       // --- Sun glow: a wide, warm, additive halo around the light (blown-out backlight).
       float g = exp(-(dist * dist) / (glowRadius * glowRadius));
@@ -186,6 +188,10 @@ const GradeShader = {
       c = mix(vec3(l2), c, saturation);
       // Gentle S-curve contrast around mid grey.
       c = (c - 0.5) * contrast + 0.5;
+      // Filmic shoulder: everything above the knee rolls off toward white instead of clipping.
+      const float knee = 0.62;
+      vec3 over = max(c - knee, 0.0);
+      c = min(c, knee) + (1.0 - knee) * (1.0 - exp(-over / (1.0 - knee)));
       // Vignette.
       vec2 d = (vUv - 0.5) * vec2(1.0, 0.85);
       c *= 1.0 - vignette * smoothstep(0.3, 1.05, length(d) * 1.6);

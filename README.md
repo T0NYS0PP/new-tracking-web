@@ -53,9 +53,10 @@ cracks, `--bg 0` drops the backdrop, `--haze` bakes aerial perspective into the 
 **Light.** The page renders through `src/fx/PostFX.ts` (three.js EffectComposer): screen-space light rays
 from the painting's light source (set per painting in `src/paintings.ts` as image coordinates), a soft bloom,
 and a grade pass (exposure, contrast, warmth, vignette, grain, shadow haze). `src/fx/Motes.ts` adds drifting
-light particles in the air in front of the scene. The "Light" button toggles all of it; the choice is
-remembered per browser. Defaults live in `DEFAULT_FX`; each painting overrides warmth, haze colour and ray
-strength.
+light particles in the air in front of the scene. The "Light" button cycles cinematic → soft → off and the
+choice is remembered per browser. Presets live in `FX_PRESETS` (ray energy is bounded and highlights roll off
+through a filmic shoulder so bright skies glow instead of clipping); each painting sets its light position,
+sun colour, warmth, haze colour and an optional exposure.
 
 ## Making the scene in Unreal Engine
 

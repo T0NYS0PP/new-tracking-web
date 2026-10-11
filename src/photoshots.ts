@@ -109,18 +109,20 @@ export const POV_CAPTION = 'POV:\nYou are inside\nphotos from 1912';
 /**
  * The reel: hard cuts, one slow camera move per shot. Moves follow the reference
  * (push in and drift, a close-up that pulls back to reveal the room, a gentle orbit, a truck).
+ * Focus points stay near the centre and zoom stays <= 1.6 so the moves hold up on any composition
+ * without per-photo tuning; tighten them once you have looked at the real photographs.
  */
 export const SEQUENCE: Shot[] = [
   // Push in toward the bench while drifting to the right, like the opening shot.
-  { photo: 'curie-1912', duration: 4.0, caption: POV_CAPTION, from: { zoom: 0 }, to: { focus: [0.56, 0.52], zoom: 1.15, yaw: -2 } },
-  // Slow approach with a slight turn: the figure stays centred while the room sweeps past.
-  { photo: 'curie-lab', duration: 3.6, caption: POV_CAPTION, from: { zoom: 0.1, yaw: 3 }, to: { focus: [0.48, 0.48], zoom: 0.95, yaw: -1.5 } },
-  // Start tight on the foreground and pull back to reveal where we are.
-  { photo: 'curie-chair', duration: 3.6, caption: null, from: { focus: [0.42, 0.56], zoom: 2.0, pitch: 2 }, to: { focus: [0.5, 0.5], zoom: 0.9 } },
-  // Orbit: the window at the back slides behind the figure.
-  { photo: 'curie-laboratory', duration: 3.6, caption: null, from: { focus: [0.46, 0.5], zoom: 0.2, yaw: -4 }, to: { focus: [0.52, 0.5], zoom: 1.0, yaw: 2.5 } },
-  // Truck left to right past the table, closing in a little.
-  { photo: 'curies-wellcome', duration: 3.8, caption: 'Look around —\nmove your head\n(or your mouse)', from: { focus: [0.42, 0.5], zoom: 0.5, pitch: 1 }, to: { focus: [0.58, 0.5], zoom: 1.2 } },
+  { photo: 'curie-1912', duration: 4.0, caption: POV_CAPTION, from: { zoom: 0 }, to: { focus: [0.55, 0.51], zoom: 1.0, yaw: -2 } },
+  // Slow approach with a slight turn: the room sweeps past while the centre stays put.
+  { photo: 'curie-lab', duration: 3.6, caption: POV_CAPTION, from: { zoom: 0.1, yaw: 3 }, to: { focus: [0.49, 0.49], zoom: 0.9, yaw: -1.5 } },
+  // Start close on the centre of the frame and pull back to reveal where we are.
+  { photo: 'curie-chair', duration: 3.6, caption: null, from: { focus: [0.5, 0.52], zoom: 1.6, pitch: 1.5 }, to: { focus: [0.5, 0.5], zoom: 0.5 } },
+  // Orbit: the background slides behind the foreground.
+  { photo: 'curie-laboratory', duration: 3.6, caption: null, from: { focus: [0.47, 0.5], zoom: 0.2, yaw: -4 }, to: { focus: [0.52, 0.5], zoom: 0.9, yaw: 2.5 } },
+  // Truck left to right, closing in a little.
+  { photo: 'curies-wellcome', duration: 3.8, caption: 'Look around —\nmove your head\n(or your mouse)', from: { focus: [0.45, 0.5], zoom: 0.4, pitch: 1 }, to: { focus: [0.55, 0.5], zoom: 1.0 } },
 ];
 
 export function findPhoto(id: string | null | undefined): ArchivePhoto {

@@ -16,6 +16,8 @@ export class HeroScene {
   readonly viewer = new ViewerCamera();
   private spark: SparkRenderer;
   private splat: SplatMesh | null = null;
+  /** Meshes that already went through viewer.addContent (which re-centres them on the pivot once). */
+  private centred = new WeakSet<SplatMesh>();
   private timer = new THREE.Timer();
   private running = false;
   private resizeObserver: ResizeObserver;
@@ -78,10 +80,52 @@ export class HeroScene {
       throw err;
     }
     this.unload();
-    this.splat = mesh;
-    this.viewer.addContent(mesh);
+    this.show(mesh);
     this.events.onProgress?.(1);
     this.events.onReady?.();
+  }
+
+  /**
+   * Fetch and parse a splat without putting it in the scene, so a later `show()` is an instant cut.
+   * The caller owns the mesh: `release()` it when it is no longer needed.
+   */
+  async preload(url: string, fileType?: SplatFileType, onProgress?: (fraction: number) => void): Promise<SplatMesh> {
+    const s = config.splat;
+    const mesh = new SplatMesh({
+      url: new URL(url, document.baseURI).href,
+      fileType,
+      onProgress: (e) => {
+        if (e.lengthComputable && e.total > 0) onProgress?.(e.loaded / e.total);
+      },
+    });
+    mesh.position.fromArray(s.position);
+    mesh.rotation.set(s.rotation[0], s.rotation[1], s.rotation[2]);
+    mesh.scale.setScalar(s.scale);
+    await mesh.initialized;
+    onProgress?.(1);
+    return mesh;
+  }
+
+  /** Make `mesh` the visible splat. The previous one is taken out of the scene but kept alive. */
+  show(mesh: SplatMesh): void {
+    if (this.splat === mesh) return;
+    if (this.splat) this.viewer.orbit.remove(this.splat);
+    if (!this.centred.has(mesh)) {
+      this.viewer.addContent(mesh);
+      this.centred.add(mesh);
+    } else {
+      this.viewer.orbit.add(mesh);
+    }
+    this.splat = mesh;
+  }
+
+  /** Dispose a preloaded mesh (removes it from the scene first if it is the visible one). */
+  release(mesh: SplatMesh): void {
+    if (this.splat === mesh) {
+      this.viewer.orbit.remove(mesh);
+      this.splat = null;
+    }
+    mesh.dispose();
   }
 
   /** The splat currently in the scene, if any. */

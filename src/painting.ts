@@ -66,7 +66,7 @@ if (checkPlatform(overlay)) {
       const bokeh = new Motes(coarse ? 14 : 28, current.light.color, 6.5, 1.3);
       bokeh.setIntensity(0.22);
       app.scene.scene.add(motes.points, bokeh.points);
-      const LABEL: Record<FXPresetName | 'off', string> = { cinematic: 'Light: cinematic', soft: 'Light: soft', off: 'Light: off' };
+      const LABEL: Record<FXPresetName | 'off', string> = { cinematic: 'Light: cinematic', soft: 'Light: soft', archival: 'Light: archival', off: 'Light: off' };
       const applyLightForPainting = (p: Painting) => {
         if (fxMode === 'off') return;
         const preset = FX_PRESETS[fxMode];

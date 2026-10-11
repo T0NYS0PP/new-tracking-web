@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 const PAGES = {
   main: { html: 'index.html', title: 'Boring Window' },
-  painting: { html: 'painting.html', title: 'Painting Walk' },
+  painting: { html: 'painting.html', title: 'Painting Walk', splats: 'splats/paintings', images: 'paintings' },
+  photos: { html: 'photos.html', title: 'Inside the Photograph', splats: 'splats/photos', images: 'photos' },
 };
 const pageArg = process.argv.indexOf('--page');
 const pageName = pageArg >= 0 ? process.argv[pageArg + 1] : 'main';
@@ -43,7 +44,7 @@ const markup =
   relativize(body)
     .replace('<canvas id="hero-canvas"', `<canvas id="hero-canvas" ${canvasAttrs}`)
     // Site navigation links point at the standalone pages; keep them absolute to the Pages site.
-    .replace(/href="\.\/(painting\.html)?"/g, (m, p1) => `href="https://t0nys0pp.github.io/new-tracking-web/${p1 ?? ''}"`)
+    .replace(/href="\.\/((?:painting|photos)\.html)?"/g, (m, p1) => `href="https://t0nys0pp.github.io/new-tracking-web/${p1 ?? ''}"`)
     .trim() +
   '\n' +
   scripts.map(relativize).join('\n');
@@ -68,12 +69,12 @@ if (pageName === 'main') {
   if (!existsSync(lite)) throw new Error('public/splats/hero-lite.spz missing: run `npm run assets`');
   files[SPLAT_PATH] = { from: 'public/splats/hero-lite.spz', contentType: 'application/wasm' };
 } else {
-  for (const name of readdirSync(resolve(root, 'public/splats/paintings'))) {
+  for (const name of readdirSync(resolve(root, `public/${page.splats}`))) {
     if (!name.endsWith('.spz')) continue;
-    files[`splats/paintings/${name}.wasm`] = { from: `public/splats/paintings/${name}`, contentType: 'application/wasm' };
+    files[`${page.splats}/${name}.wasm`] = { from: `public/${page.splats}/${name}`, contentType: 'application/wasm' };
   }
-  for (const name of readdirSync(resolve(root, 'public/paintings'))) {
-    if (/\.(jpe?g|png|webp)$/i.test(name)) files[`paintings/${name}`] = `public/paintings/${name}`;
+  for (const name of readdirSync(resolve(root, `public/${page.images}`))) {
+    if (/\.(jpe?g|png|webp)$/i.test(name)) files[`${page.images}/${name}`] = `public/${page.images}/${name}`;
   }
 }
 writeFileSync(resolve(out, 'files.json'), JSON.stringify(files, null, 2));

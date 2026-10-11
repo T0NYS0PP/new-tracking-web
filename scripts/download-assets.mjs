@@ -2,9 +2,10 @@
 //  - MediaPipe Face Landmarker model (float16)
 //  - A sample Gaussian splat (.spz) from the Niantic spz repository
 //  - Depth Anything V2 (small) ONNX model + public-domain paintings, converted to splats
+//  - Public-domain archive photographs (Wikimedia Commons), converted to splats
 // Usage: node scripts/download-assets.mjs
 import { execFileSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, statSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -53,7 +54,24 @@ const PAINTINGS = [
 ];
 for (const p of PAINTINGS) ASSETS.push({ url: p.url, dest: `public/paintings/${p.id}.jpg` });
 
-for (const { url, dest } of ASSETS) {
+// Archive photographs for photos.html (Marie Curie's laboratory). Wikimedia Commons serves a resized
+// copy through Special:FilePath; a descriptive User-Agent is required by their policy. Keep ids in
+// sync with src/photoshots.ts. A photo that cannot be fetched is skipped with a warning (the page
+// skips shots whose splat is missing) so one dead link never breaks the build.
+const commons = (file, width = 2000) => `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=${width}`;
+const PHOTO_ARGS = ['--fov', '60', '--near', '1.8', '--far', '7', '--gamma', '0.8', '--haze', '0.08', '--max-splats', '600000'];
+const PHOTOS = [
+  { id: 'curie-1912', url: commons('Marie Curie in her Paris Laboratory, 1912.jpg') },
+  { id: 'curie-lab', url: commons('Marie Curie in her laboratory.jpg') },
+  { id: 'curie-chair', url: commons('Marie Curie on a chair in her laboratory.jpg') },
+  { id: 'curie-laboratory', url: commons('Marie Curie-Laboratory.jpg') },
+  { id: 'curies-wellcome', url: commons('Marie and Pierre Curie (centre) in their laboratory, Paris Wellcome V0030700.jpg') },
+];
+for (const p of PHOTOS) ASSETS.push({ url: p.url, dest: `public/photos/${p.id}.jpg`, optional: true });
+
+const HEADERS = { 'User-Agent': 'new-tracking-web/0.1 (asset download; https://github.com/t0nys0pp/new-tracking-web)' };
+
+for (const { url, dest, optional } of ASSETS) {
   const out = resolve(root, dest);
   if (existsSync(out) && statSync(out).size > 0) {
     console.log(`[assets] exists   ${dest}`);
@@ -61,10 +79,16 @@ for (const { url, dest } of ASSETS) {
   }
   mkdirSync(dirname(out), { recursive: true });
   console.log(`[assets] download ${url}`);
-  const res = await fetch(url);
-  if (!res.ok || !res.body) throw new Error(`Failed ${url}: ${res.status}`);
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(out));
-  console.log(`[assets] saved    ${dest} (${(statSync(out).size / 1e6).toFixed(1)} MB)`);
+  try {
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    await pipeline(Readable.fromWeb(res.body), createWriteStream(out));
+    console.log(`[assets] saved    ${dest} (${(statSync(out).size / 1e6).toFixed(1)} MB)`);
+  } catch (err) {
+    if (existsSync(out)) rmSync(out);
+    if (!optional) throw new Error(`Failed ${url}: ${err.message}`);
+    console.warn(`[assets] skipped  ${dest}: ${err.message}`);
+  }
 }
 
 // Lighter variant (SH degree 1, ~13 MB) for hosts with per-file size limits such as the artifact viewer.
@@ -89,4 +113,22 @@ for (const p of PAINTINGS) {
     [resolve(root, 'scripts/painting-to-splat.mjs'), resolve(root, `public/paintings/${p.id}.jpg`), out, '--model', model, ...p.args],
     { stdio: 'inherit' },
   );
+}
+
+// Photographs -> splats. Black-and-white prints get a neutral haze and a slightly flatter depth curve.
+mkdirSync(resolve(root, 'public/splats/photos'), { recursive: true });
+for (const p of PHOTOS) {
+  const src = resolve(root, `public/photos/${p.id}.jpg`);
+  const out = resolve(root, `public/splats/photos/${p.id}.spz`);
+  if (!existsSync(src)) {
+    console.warn(`[assets] no image for ${p.id}, skipping its splat`);
+    continue;
+  }
+  if (existsSync(out) && statSync(out).size > 0) {
+    console.log(`[assets] exists   public/splats/photos/${p.id}.spz`);
+    continue;
+  }
+  execFileSync(process.execPath, [resolve(root, 'scripts/painting-to-splat.mjs'), src, out, '--model', model, ...PHOTO_ARGS], {
+    stdio: 'inherit',
+  });
 }

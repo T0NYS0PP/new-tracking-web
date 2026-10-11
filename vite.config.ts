@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         painting: resolve(__dirname, 'painting.html'),
+        photos: resolve(__dirname, 'photos.html'),
       },
     },
   },

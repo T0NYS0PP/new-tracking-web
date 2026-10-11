@@ -22,6 +22,7 @@ export class HeroOverlay {
   private debug = must<HTMLElement>('#debug-panel');
   private loaderFill = must<HTMLElement>('#loader-fill');
   private loaderText = must<HTMLElement>('#loader-text');
+  private progressLabel = 'Loading something boring…';
 
   setState(state: HeroState): void {
     this.root.dataset.state = state;
@@ -41,7 +42,12 @@ export class HeroOverlay {
   setProgress(fraction: number): void {
     const pct = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
     this.loaderFill.style.width = `${pct}%`;
-    this.loaderText.textContent = pct < 100 ? `Loading something boring… ${pct}%` : 'Almost there.';
+    this.loaderText.textContent = pct < 100 ? `${this.progressLabel} ${pct}%` : 'Almost there.';
+  }
+
+  /** Text shown next to the percentage while a splat downloads. */
+  setProgressLabel(text: string): void {
+    this.progressLabel = text;
   }
 
   setLoaderMessage(text: string): void {

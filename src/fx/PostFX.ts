@@ -28,9 +28,10 @@ export interface PostFXSettings {
   };
 }
 
-export type FXPresetName = 'cinematic' | 'soft';
+export type FXPresetName = 'cinematic' | 'soft' | 'archival';
 
 const SUN: [number, number, number] = [1.0, 0.86, 0.6];
+const DAYLIGHT: [number, number, number] = [1.0, 1.0, 1.0];
 
 export const FX_PRESETS: Record<FXPresetName, PostFXSettings> = {
   // Ray energy is bounded: weight * (1 - decay^64) / (1 - decay) * exposure ≈ 0.56 when every
@@ -69,6 +70,26 @@ export const FX_PRESETS: Record<FXPresetName, PostFXSettings> = {
       shadowTint: [0.35, 0.45, 0.65],
       splitTone: 0.08,
       saturation: 1.0,
+    },
+  },
+  // Black-and-white archive photographs: no colour work at all, the windows blow out into a soft
+  // white glow (bloom + a little diffusion), heavier vignette and visible grain like a scanned print.
+  archival: {
+    rays: { density: 0.8, decay: 0.96, weight: 0.018, exposure: 0.3, threshold: 0.8, flicker: 0.04 },
+    sun: { glow: 0.1, radius: 0.3, haze: 0.05, color: DAYLIGHT },
+    bloom: { strength: 0.5, radius: 0.6, threshold: 0.72 },
+    diffusion: { strength: 0.14, radius: 1.0, threshold: 0.45 },
+    grade: {
+      exposure: 1.0,
+      contrast: 1.12,
+      warmth: 0,
+      vignette: 0.5,
+      grain: 0.045,
+      haze: [0.6, 0.6, 0.6],
+      hazeAmount: 0.03,
+      shadowTint: [1, 1, 1],
+      splitTone: 0,
+      saturation: 0,
     },
   },
 };

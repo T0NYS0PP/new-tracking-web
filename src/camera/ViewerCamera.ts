@@ -2,6 +2,18 @@ import * as THREE from 'three';
 import { config } from '../config';
 import { CENTER_POSE, type HeadPose } from '../input/types';
 
+/**
+ * Cinematic offset composed with the head pose: a camera rig that trucks (pan), dollies (zoom)
+ * and turns (yaw / pitch) the world around the viewer, in world units / radians. The head-coupled
+ * window effect keeps working on top of it.
+ */
+export interface CameraRig {
+  pan: [number, number];
+  zoom: number;
+  yaw: number;
+  pitch: number;
+}
+
 export interface ViewerResponse {
   /** Exponential approach rate toward the target (higher = snappier). */
   smoothingRate: number;
@@ -30,6 +42,7 @@ export class ViewerCamera {
   private enabled = true;
   private response: ViewerResponse = { smoothingRate: config.camera.smoothingRate, predictMs: 0 };
   private dolly = 0;
+  private rig: CameraRig = { pan: [0, 0], zoom: 0, yaw: 0, pitch: 0 };
 
   constructor() {
     const c = config.camera;
@@ -71,6 +84,21 @@ export class ViewerCamera {
 
   getDolly(): number {
     return this.dolly;
+  }
+
+  /** Cinematic camera rig (see CameraRig); applied every frame in addition to the head pose and dolly. */
+  setRig(rig: Partial<CameraRig>): void {
+    if (rig.pan) {
+      this.rig.pan[0] = rig.pan[0];
+      this.rig.pan[1] = rig.pan[1];
+    }
+    if (rig.zoom !== undefined) this.rig.zoom = rig.zoom;
+    if (rig.yaw !== undefined) this.rig.yaw = rig.yaw;
+    if (rig.pitch !== undefined) this.rig.pitch = rig.pitch;
+  }
+
+  getRig(): Readonly<CameraRig> {
+    return this.rig;
   }
 
   /** Per-input responsiveness: a filtered, 30 Hz webcam wants prediction; a 120 Hz mouse does not. */
@@ -127,9 +155,10 @@ export class ViewerCamera {
     this.camera.projectionMatrix.makePerspective(left, right, top, bottom, n, c.far);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
 
-    // --- 3. Orbit of the world around the pivot (exaggeration) + dolly ---
-    this.orbit.rotation.set(y * c.maxPitch, -x * c.maxYaw, 0, 'YXZ');
-    this.orbit.position.set(c.pivot[0], c.pivot[1], c.pivot[2] + this.dolly);
+    // --- 3. Orbit of the world around the pivot (exaggeration) + dolly + cinematic rig ---
+    const r = this.rig;
+    this.orbit.rotation.set(y * c.maxPitch + r.pitch, -x * c.maxYaw + r.yaw, 0, 'YXZ');
+    this.orbit.position.set(c.pivot[0] - r.pan[0], c.pivot[1] - r.pan[1], c.pivot[2] + this.dolly + r.zoom);
   }
 }
 

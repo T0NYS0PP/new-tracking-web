@@ -1,0 +1,162 @@
+/* Reel layout (photos.html): caption / rounded frame / original photo, on black, like the reference */
+:root {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --reel-gap: clamp(14px, 3vh, 30px);
+  /* Frame width: fits caption + frame + picture-in-picture + controls into the viewport; scrolls on very short ones. */
+  --frame-w: min(100%, 1100px, calc((100svh - 420px) * 1.15));
+  --pip-ratio: 0.36;
+}
+
+.hero--reel {
+  height: auto;
+  min-height: 100svh;
+  overflow: visible;
+}
+.hero--reel .hero__poster { background: #000; }
+
+.reel {
+  position: relative;
+  z-index: 3;
+  min-height: 100svh;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--reel-gap);
+  padding: calc(var(--gutter) * 0.6 + 52px) var(--gutter) calc(var(--gutter) * 0.8);
+}
+
+.reel__caption {
+  margin: 0;
+  min-height: 3.6em;
+  font-family: var(--font-serif);
+  font-size: clamp(20px, 2.6vw, 34px);
+  line-height: 1.2;
+  text-align: center;
+  white-space: pre-line;
+  text-wrap: balance;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+.hero[data-state="ready"] .reel__caption,
+.hero[data-state="tracking"] .reel__caption { opacity: 1; transform: none; }
+.hero[data-state="ready"] .reel__caption.is-hidden,
+.hero[data-state="tracking"] .reel__caption.is-hidden { opacity: 0; }
+
+/* 3:2 frame that fits the viewport with the caption and the picture-in-picture around it */
+.reel__frame {
+  position: relative;
+  width: var(--frame-w);
+  min-width: min(100%, 320px);
+  aspect-ratio: 3 / 2;
+  border-radius: clamp(12px, 2vw, 22px);
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  isolation: isolate;
+}
+.reel__frame .hero__canvas { position: absolute; inset: 0; }
+
+.reel__cut {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms linear;
+}
+.reel__frame.is-cutting .reel__cut { opacity: 1; }
+
+.reel__buffer {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 3;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(244, 241, 234, 0.7);
+  opacity: 0;
+  animation: pulse 900ms ease-in-out infinite;
+}
+.reel__frame.is-buffering .reel__buffer { opacity: 1; }
+
+.reel__pip {
+  margin: 0;
+  width: max(140px, calc(var(--frame-w) * var(--pip-ratio)));
+  max-width: 100%;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  opacity: 0;
+  transition: opacity 600ms ease 200ms;
+}
+.hero[data-state="ready"] .reel__pip,
+.hero[data-state="tracking"] .reel__pip { opacity: 1; }
+.reel__pip img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #111;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+.reel__pip figcaption {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+.reel__pip figcaption a { text-decoration: underline; text-underline-offset: 2px; }
+.reel__pip figcaption a:hover { color: var(--fg); }
+
+.reel__controls {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  opacity: 0;
+  transition: opacity 600ms ease 300ms;
+}
+.hero[data-state="ready"] .reel__controls,
+.hero[data-state="tracking"] .reel__controls { opacity: 1; }
+.reel__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+.reel__counter {
+  min-width: 3.4em;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.reel__hint { margin: 0; font-size: 11px; color: rgba(244, 241, 234, 0.45); text-align: center; }
+
+.reel-btn {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 241, 234, 0.25);
+  background: rgba(5, 5, 5, 0.45);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 200ms ease, color 200ms ease;
+}
+.reel-btn:hover { color: var(--fg); border-color: rgba(244, 241, 234, 0.7); }
+.reel-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.reel-btn--primary { min-width: 5.5em; color: var(--fg); border-color: rgba(244, 241, 234, 0.5); font-weight: 600; }
+
+/* The camera controls sit in the flow under the frame instead of the hero's top-right corner */
+.hero--reel .hero__controls {
+  position: static;
+  max-width: none;
+  justify-items: center;
+  text-align: center;
+  opacity: 1;
+  transition: none;
+}
+.hero--reel .hero__buttons { justify-content: center; }
+
+@media (max-width: 760px) {
+  .reel { padding-top: calc(var(--gutter) * 0.6 + 44px); }
+  :root { --frame-w: min(100%, calc((100svh - 380px) * 1.5)); --pip-ratio: 0.5; }
+  .reel__caption { font-size: clamp(18px, 5.2vw, 24px); min-height: 0; }
+}

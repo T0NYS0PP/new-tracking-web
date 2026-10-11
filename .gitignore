@@ -10,7 +10,10 @@ public/mediapipe/wasm/
 # Downloaded by `npm run assets`
 public/mediapipe/face_landmarker.task
 public/splats/*.spz
+# Converted from the downloaded photographs by `npm run assets`
+public/splats/photos/
 public/splats/*.sog
 public/splats/*.ply
 tools/models/
 public/paintings/
+public/photos/

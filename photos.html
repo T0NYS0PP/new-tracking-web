@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="POV: you are inside photographs from 1912. Marie Curie's laboratory turned into walkable 3D scenes with cinematic camera moves and head tracking." />
+    <title>Inside the photograph — Marie Curie's laboratory, 1912</title>
+  </head>
+  <body>
+    <main id="hero" class="hero hero--reel" data-state="booting">
+      <div class="hero__poster" aria-hidden="true"></div>
+
+      <header class="hero__nav">
+        <a class="hero__logo" href="./">BORING</a>
+        <nav class="hero__links" aria-label="Primary">
+          <a href="./">Window</a>
+          <a href="./painting.html">Painting</a>
+          <a href="./photos.html" aria-current="page">Photos</a>
+        </nav>
+      </header>
+
+      <section class="reel" aria-label="Inside the photograph">
+        <p id="reel-caption" class="reel__caption" aria-live="polite">POV:
+You are inside
+photos from 1912</p>
+
+        <div id="frame" class="reel__frame">
+          <canvas id="hero-canvas" class="hero__canvas" aria-hidden="true"></canvas>
+          <div class="reel__cut" aria-hidden="true"></div>
+          <div class="reel__buffer" aria-hidden="true"></div>
+        </div>
+
+        <figure class="reel__pip">
+          <img id="pip-image" alt="" decoding="async" />
+          <figcaption id="pip-caption">Original photograph · <a id="pip-link" href="#" target="_blank" rel="noopener">source</a></figcaption>
+        </figure>
+
+        <div class="reel__controls">
+          <div class="reel__row">
+            <button id="prev-shot" class="reel-btn" type="button" title="Previous shot (←)" aria-label="Previous shot">◀</button>
+            <button id="play-toggle" class="reel-btn reel-btn--primary" type="button" aria-pressed="true" title="Space">Pause</button>
+            <button id="next-shot" class="reel-btn" type="button" title="Next shot (→)" aria-label="Next shot">▶</button>
+            <span id="shot-counter" class="reel__counter">1 / 5</span>
+            <button id="fx-toggle" class="reel-btn" type="button" aria-pressed="true" title="Archival grade on / off">Light: archival</button>
+          </div>
+          <div class="hero__controls">
+            <div class="hero__buttons">
+              <button id="track-toggle" class="track-toggle" type="button" aria-pressed="false">
+                <span class="track-toggle__dot" aria-hidden="true"></span>
+                <span class="track-toggle__label">Look through the window</span>
+              </button>
+              <button id="track-recenter" class="track-recenter" type="button" title="Capture the current head position as neutral (R)" hidden>Recenter</button>
+            </div>
+            <p id="track-status" class="track-status" role="status" aria-live="polite"></p>
+            <p class="hero__privacy">Camera frames are processed on this device only. Nothing is sent or stored.</p>
+          </div>
+          <p class="reel__hint">Space pauses · ← → cut · scroll over the frame to scrub while paused</p>
+        </div>
+      </section>
+
+      <pre id="debug-panel" class="debug-panel" aria-hidden="true" hidden></pre>
+
+      <div class="hero__loader" aria-live="polite">
+        <div class="hero__loader-bar"><span id="loader-fill"></span></div>
+        <p id="loader-text">Developing the first photograph…</p>
+      </div>
+    </main>
+    <script type="module" src="/src/photos.ts"></script>
+  </body>
+</html>

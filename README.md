@@ -25,8 +25,8 @@ Head tracking needs a secure context: `localhost` is fine, anything else must be
 | `npm run dev` | Vite dev server |
 | `npm run build` | Typecheck + production build into `dist/` |
 | `npm run preview` | Serve `dist/` locally |
-| `npm run assets` | Download the face model, the sample splat, the depth model and the paintings; convert paintings to splats |
-| `npm run build:artifact` | Page fragment + file map for the claude.ai Artifact (`-- --page painting` for the painting page) |
+| `npm run assets` | Download the face model, the sample splat, the depth model, the paintings and the archive photos; convert them to splats |
+| `npm run build:artifact` | Page fragment + file map for the claude.ai Artifact (`-- --page painting` / `-- --page photos` for the other pages) |
 | `npm run typecheck` | `tsc --noEmit` |
 
 ## Step inside a painting (`painting.html`)
@@ -58,6 +58,30 @@ choice is remembered per browser. Presets live in `FX_PRESETS` (ray energy is bo
 through a filmic shoulder so bright skies glow instead of clipping); each painting sets its light position,
 sun colour, warmth, haze colour and an optional exposure.
 
+## Inside the photograph (`photos.html`)
+
+A third page reproduces the "POV: you are inside photos from 1911" reel: black-and-white archive photographs
+of Marie Curie's laboratory (Wikimedia Commons, public domain / CC BY) become depth splats, and a short
+sequence of shots plays with one slow camera move each and a hard cut between them, the original photo
+picture-in-picture below the frame.
+
+- `src/photoshots.ts` holds the photo catalogue and the `SEQUENCE`: per shot a photo, a duration, a `from`
+  and a `to` pose (`focus` = image point kept centred, `zoom` = how far the scene slides toward you,
+  `yaw` / `pitch` in degrees) and a caption. Add or reorder shots there; nothing else changes.
+- `src/camera/ViewerCamera.ts` gained a cinematic rig (`setRig`) composed with the head pose, so the
+  head-coupled window still works on top of the authored move.
+- `src/hero/HeroScene.ts` can `preload` / `show` / `release` splats, so cuts are instant: the next shot's
+  splat is fetched while the current one plays (phones keep two in memory, desktops keep them all).
+- The `archival` preset in `src/fx/PostFX.ts` is a monochrome grade: windows bloom out to white,
+  grain, vignette, no colour work. The reel's dust is a few white motes.
+- Space pauses, ← → cut, scrolling over the frame scrubs the move while paused, `#curie-lab` starts on a photo.
+
+`npm run assets` downloads the photos from Commons (`scripts/download-assets.mjs`, `PHOTOS`) and converts
+them with `--fov 60 --near 1.8 --far 7 --gamma 0.8 --haze 0.08`. A photo that cannot be fetched is skipped
+with a warning and the page skips its shots. To use your own photographs, drop them in `public/photos/`,
+convert them with `scripts/painting-to-splat.mjs` into `public/splats/photos/` and add them to
+`src/photoshots.ts`.
+
 ## Making the scene in Unreal Engine
 
 `docs/unreal-pipeline.md` (Japanese) walks through exporting a training dataset from an Unreal level with
@@ -86,6 +110,9 @@ src/
   input/OrientationInput.ts device tilt fallback (iOS asks permission on the toggle gesture)
   ui/HeroOverlay.ts       DOM overlay: loader, toggle, status, state attributes
   styles/hero.css
+  painting.ts / paintings.ts  step inside a painting (painting.html)
+  photos.ts / photoshots.ts   inside the photograph: shot sequence player (photos.html)
+  fx/PostFX.ts, fx/Motes.ts   light: rays, bloom, grade (cinematic / soft / archival), motes
 scripts/
   copy-mediapipe.mjs      postinstall: self-host the MediaPipe WASM bundle
   download-assets.mjs     fetch dev assets

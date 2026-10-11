@@ -179,23 +179,92 @@ for (let v = 0; v < H; v++) {
 }
 const mainCount = splats.length;
 
-// Backdrop: a blurred, coarse copy of the painting a little beyond the far plane, mirrored outward
-// so the view never runs into a hard black edge when the head moves.
+// Backdrop: what is *behind* the foreground, placed a little beyond the far plane and mirrored
+// outward so the view never runs into a hard black edge. Foreground pixels are excluded and the
+// holes they leave are filled from the surrounding background (normalised box blur), so a
+// disoccluded region shows sky-coloured blur instead of a dark ghost of the object in front.
 let bgCount = 0;
 if (cfg.bg) {
-  const step = 6;
+  const step = 5;
   const padX = Math.round((W * (cfg.bgExtend - 1)) / 2);
   const padY = Math.round((H * (cfg.bgExtend - 1)) / 2);
   const EW = W + 2 * padX;
   const EH = H + 2 * padY;
   const bw = Math.max(8, Math.round(EW / step));
   const bh = Math.max(8, Math.round(EH / step));
-  const blurred = await sharp(rgb, { raw: { width: W, height: H, channels: 3 } })
+
+  // Background-only colour (foreground masked to alpha 0), mirrored and downscaled.
+  const FG = 0.35; // normalised disparity above this counts as foreground
+  const rgba = Buffer.alloc(W * H * 4);
+  for (let i = 0; i < W * H; i++) {
+    const bg = depthN[i] < FG && !edgeD[i];
+    rgba[i * 4] = rgb[i * 3];
+    rgba[i * 4 + 1] = rgb[i * 3 + 1];
+    rgba[i * 4 + 2] = rgb[i * 3 + 2];
+    rgba[i * 4 + 3] = bg ? 255 : 0;
+  }
+  const small = await sharp(rgba, { raw: { width: W, height: H, channels: 4 } })
     .extend({ left: padX, right: padX, top: padY, bottom: padY, extendWith: 'mirror' })
-    .blur(4)
-    .resize(bw, bh, { fit: 'fill' })
+    .resize(bw, bh, { fit: 'fill', kernel: 'nearest' })
     .raw()
     .toBuffer();
+  // Normalised box blur: colour*mask and mask blurred together, repeated until every hole is filled.
+  let col = new Float32Array(bw * bh * 3);
+  let wgt = new Float32Array(bw * bh);
+  for (let i = 0; i < bw * bh; i++) {
+    const m = small[i * 4 + 3] / 255;
+    col[i * 3] = small[i * 4] * m;
+    col[i * 3 + 1] = small[i * 4 + 1] * m;
+    col[i * 3 + 2] = small[i * 4 + 2] * m;
+    wgt[i] = m;
+  }
+  const boxBlur = (src, ch, r) => {
+    const dst = new Float32Array(src.length);
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        for (let c = 0; c < ch; c++) {
+          let acc = 0;
+          let n = 0;
+          for (let dy = -r; dy <= r; dy++) {
+            const yy = Math.min(bh - 1, Math.max(0, y + dy));
+            for (let dx = -r; dx <= r; dx++) {
+              const xx = Math.min(bw - 1, Math.max(0, x + dx));
+              acc += src[(yy * bw + xx) * ch + c];
+              n++;
+            }
+          }
+          dst[(y * bw + x) * ch + c] = acc / n;
+        }
+      }
+    }
+    return dst;
+  };
+  for (let pass = 0; pass < 6; pass++) {
+    const bc = boxBlur(col, 3, 3);
+    const bwgt = boxBlur(wgt, 1, 3);
+    let unfilled = 0;
+    for (let i = 0; i < bw * bh; i++) {
+      if (wgt[i] < 0.999) {
+        // Replace only where there is no (or weak) background information yet.
+        col[i * 3] = bc[i * 3];
+        col[i * 3 + 1] = bc[i * 3 + 1];
+        col[i * 3 + 2] = bc[i * 3 + 2];
+        wgt[i] = bwgt[i];
+        if (bwgt[i] < 0.05) unfilled++;
+      }
+    }
+    if (unfilled === 0 && pass >= 1) break;
+  }
+  // Final soft blur for a painterly out-of-focus backdrop.
+  const colN = new Float32Array(bw * bh * 3);
+  for (let i = 0; i < bw * bh; i++) {
+    const w = Math.max(1e-3, wgt[i]);
+    colN[i * 3] = col[i * 3] / w;
+    colN[i * 3 + 1] = col[i * 3 + 1] / w;
+    colN[i * 3 + 2] = col[i * 3 + 2] / w;
+  }
+  const soft = boxBlur(colN, 3, 1);
+
   const z = cfg.far * 1.12;
   const px = z / f;
   const s = px * step * 1.6;
@@ -209,9 +278,9 @@ if (cfg.bg) {
         sx: s,
         sy: s,
         sz: s * 0.2,
-        r: blurred[i * 3],
-        g: blurred[i * 3 + 1],
-        b: blurred[i * 3 + 2],
+        r: Math.round(Math.min(255, Math.max(0, soft[i * 3]))),
+        g: Math.round(Math.min(255, Math.max(0, soft[i * 3 + 1]))),
+        b: Math.round(Math.min(255, Math.max(0, soft[i * 3 + 2]))),
         a: 1,
       });
       bgCount++;

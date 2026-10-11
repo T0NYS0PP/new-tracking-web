@@ -142,6 +142,9 @@ export async function bootHero(opts: BootOptions): Promise<HeroApp> {
       overlay.setLoaderMessage('Could not load the scene. Run `npm run assets` and refresh.');
       throw new Error(`failed to load ${url}`);
     }
+    // Give the renderer a few frames to sort and upload the new splats before lifting the loader,
+    // so a scene switch never flashes the previous scene.
+    await new Promise<void>((resolve) => setTimeout(resolve, 350));
     splatReady = true;
     const s = tracker?.getStatus();
     overlay.setState(s === 'tracking' || s === 'lost' || s === 'calibrating' ? 'tracking' : 'ready');

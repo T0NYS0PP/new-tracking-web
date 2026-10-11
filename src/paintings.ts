@@ -26,7 +26,7 @@ export const PAINTINGS: Painting[] = [
     image: assetUrl('paintings/starry-night.jpg'),
     walkDepth: 1.8,
     fovDeg: 66,
-    light: { x: 0.9, y: 0.1, rays: 1.0, color: '#ffe9a8', warmth: -0.1, haze: [0.55, 0.65, 0.9] },
+    light: { x: 0.9, y: 0.1, rays: 0.7, color: '#fff1cf', warmth: -0.2, haze: [0.55, 0.65, 0.9] },
   },
   {
     id: 'shipwreck',
@@ -37,7 +37,7 @@ export const PAINTINGS: Painting[] = [
     image: assetUrl('paintings/shipwreck.jpg'),
     walkDepth: 2.2,
     fovDeg: 66,
-    light: { x: 0.48, y: 0.18, rays: 1.25, color: '#ffcf8a', warmth: 0.35, haze: [0.8, 0.72, 0.55] },
+    light: { x: 0.48, y: 0.18, rays: 1.0, color: '#ffcf8a', warmth: 0.3, haze: [0.8, 0.72, 0.55] },
   },
   {
     id: 'great-wave',

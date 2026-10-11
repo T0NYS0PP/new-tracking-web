@@ -36,20 +36,20 @@ export const FX_PRESETS: Record<FXPresetName, PostFXSettings> = {
   // Ray energy is bounded: weight * (1 - decay^64) / (1 - decay) * exposure ≈ 0.56 when every
   // sample along the march is fully bright, so bright skies glow instead of clipping to white.
   cinematic: {
-    rays: { density: 1.0, decay: 0.975, weight: 0.025, exposure: 0.7, threshold: 0.62, flicker: 0.12 },
-    sun: { glow: 0.3, radius: 0.4, haze: 0.16, color: SUN },
-    bloom: { strength: 0.3, radius: 0.5, threshold: 0.78 },
-    diffusion: { strength: 0.18, radius: 0.9, threshold: 0.35 },
+    rays: { density: 1.0, decay: 0.975, weight: 0.025, exposure: 0.6, threshold: 0.62, flicker: 0.12 },
+    sun: { glow: 0.22, radius: 0.32, haze: 0.08, color: SUN },
+    bloom: { strength: 0.28, radius: 0.5, threshold: 0.78 },
+    diffusion: { strength: 0.1, radius: 0.9, threshold: 0.4 },
     grade: {
       exposure: 1.0,
-      contrast: 1.1,
+      contrast: 1.14,
       warmth: 0.2,
       vignette: 0.4,
       grain: 0.02,
       haze: [0.86, 0.78, 0.62],
-      hazeAmount: 0.04,
+      hazeAmount: 0.02,
       shadowTint: [0.35, 0.45, 0.65],
-      splitTone: 0.2,
+      splitTone: 0.14,
       saturation: 1.05,
     },
   },
@@ -139,7 +139,7 @@ const LightShader = {
 
       // --- Lit haze: light scattering in the air lifts everything near the sun toward its colour,
       // strongest in darker pixels so it reads as fog rather than extra brightness.
-      float h = exp(-(dist * dist) / (0.9 * 0.9)) * sunHaze * lightStrength;
+      float h = exp(-(dist * dist) / (0.55 * 0.55)) * sunHaze * lightStrength;
       col = mix(col, max(col, sunColor * 0.85), h * (1.0 - smoothstep(0.0, 0.8, luma(col))));
 
       gl_FragColor = vec4(col, base.a);

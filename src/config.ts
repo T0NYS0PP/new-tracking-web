@@ -99,3 +99,29 @@ export const config = {
 } as const;
 
 export type Config = typeof config;
+
+type Widen<T> = T extends number ? number : T extends string ? string : T extends boolean ? boolean : T;
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends readonly unknown[]
+    ? T[K] | Widen<T[K][number]>[]
+    : T[K] extends object
+      ? DeepPartial<T[K]>
+      : Widen<T[K]>;
+};
+
+/** Deep-merge page-specific overrides into the shared config (arrays are replaced). */
+export function configure(overrides: DeepPartial<Config>): void {
+  merge(config as unknown as Record<string, unknown>, overrides as Record<string, unknown>);
+}
+
+function merge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined) continue;
+    const current = target[key];
+    if (value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current)) {
+      merge(current as Record<string, unknown>, value as Record<string, unknown>);
+    } else {
+      target[key] = value;
+    }
+  }
+}

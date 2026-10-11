@@ -12,3 +12,5 @@ public/mediapipe/face_landmarker.task
 public/splats/*.spz
 public/splats/*.sog
 public/splats/*.ply
+tools/models/
+public/paintings/

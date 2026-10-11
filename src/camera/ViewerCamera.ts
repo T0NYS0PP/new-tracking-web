@@ -29,6 +29,7 @@ export class ViewerCamera {
   private aspect = 1;
   private enabled = true;
   private response: ViewerResponse = { smoothingRate: config.camera.smoothingRate, predictMs: 0 };
+  private dolly = 0;
 
   constructor() {
     const c = config.camera;
@@ -57,6 +58,19 @@ export class ViewerCamera {
     }
     this.target = pose;
     this.targetTime = t;
+  }
+
+  /**
+   * Slide the whole scene toward the viewer (positive) or away (negative) in world units.
+   * The camera itself stays in front of the window plane so the off-axis projection holds;
+   * content that passes behind the camera is simply culled, which reads as walking into the scene.
+   */
+  setDolly(distance: number): void {
+    this.dolly = distance;
+  }
+
+  getDolly(): number {
+    return this.dolly;
   }
 
   /** Per-input responsiveness: a filtered, 30 Hz webcam wants prediction; a 120 Hz mouse does not. */
@@ -113,8 +127,9 @@ export class ViewerCamera {
     this.camera.projectionMatrix.makePerspective(left, right, top, bottom, n, c.far);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
 
-    // --- 3. Orbit of the world around the pivot (exaggeration) ---
+    // --- 3. Orbit of the world around the pivot (exaggeration) + dolly ---
     this.orbit.rotation.set(y * c.maxPitch, -x * c.maxYaw, 0, 'YXZ');
+    this.orbit.position.set(c.pivot[0], c.pivot[1], c.pivot[2] + this.dolly);
   }
 }
 

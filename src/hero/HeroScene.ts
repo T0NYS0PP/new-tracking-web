@@ -18,6 +18,8 @@ export class HeroScene {
   private timer = new THREE.Timer();
   private running = false;
   private resizeObserver: ResizeObserver;
+  private frameListeners = new Set<(dt: number, time: number) => void>();
+  private elapsed = 0;
 
   static isSupported(): boolean {
     try {
@@ -73,10 +75,25 @@ export class HeroScene {
       this.events.onError?.(err);
       throw err;
     }
+    this.unload();
     this.splat = mesh;
     this.viewer.addContent(mesh);
     this.events.onProgress?.(1);
     this.events.onReady?.();
+  }
+
+  /** Remove and dispose the current splat (used when switching scenes). */
+  unload(): void {
+    if (!this.splat) return;
+    this.viewer.orbit.remove(this.splat);
+    this.splat.dispose();
+    this.splat = null;
+  }
+
+  /** Called every rendered frame before the camera update. */
+  onFrame(listener: (dt: number, time: number) => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
   }
 
   start(): void {
@@ -106,6 +123,8 @@ export class HeroScene {
   private frame(): void {
     this.timer.update();
     const dt = Math.min(0.1, this.timer.getDelta());
+    this.elapsed += dt;
+    for (const l of this.frameListeners) l(dt, this.elapsed);
     this.viewer.update(dt);
     this.renderer.render(this.scene, this.viewer.camera);
   }

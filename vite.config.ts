@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -13,6 +14,12 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: false,
+    rolldownOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        painting: resolve(__dirname, 'painting.html'),
+      },
+    },
   },
   optimizeDeps: {
     // Spark ships pre-bundled ESM with inline workers; keep it out of the dep optimizer.

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Step inside a painting: public-domain masterpieces turned into Gaussian splats you can walk into, with head tracking." />
+    <title>Step inside the painting</title>
+  </head>
+  <body>
+    <main id="hero" class="hero hero--painting" data-state="booting">
+      <canvas id="hero-canvas" class="hero__canvas" aria-hidden="true"></canvas>
+      <div class="hero__poster" aria-hidden="true"></div>
+      <div class="hero__shade" aria-hidden="true"></div>
+
+      <header class="hero__nav">
+        <a class="hero__logo" href="./">BORING</a>
+        <nav class="hero__links" aria-label="Primary">
+          <a href="./">Window</a>
+          <a href="./painting.html" aria-current="page">Painting</a>
+        </nav>
+      </header>
+
+      <section class="painting__intro" aria-live="polite">
+        <p class="painting__eyebrow">What if you could step inside a painting?</p>
+        <h1 id="painting-title" class="painting__title">The Starry Night</h1>
+        <p id="painting-meta" class="painting__meta">Vincent van Gogh · 1889</p>
+      </section>
+
+      <div class="hero__content" aria-hidden="true"></div>
+
+      <div class="hero__controls">
+        <div class="hero__buttons">
+          <button id="track-toggle" class="track-toggle" type="button" aria-pressed="false">
+            <span class="track-toggle__dot" aria-hidden="true"></span>
+            <span class="track-toggle__label">Look through the window</span>
+          </button>
+          <button id="track-recenter" class="track-recenter" type="button" title="Capture the current head position as neutral (R)" hidden>Recenter</button>
+        </div>
+        <p id="track-status" class="track-status" role="status" aria-live="polite"></p>
+        <p class="hero__privacy">Camera frames are processed on this device only. Nothing is sent or stored.</p>
+      </div>
+
+      <div class="walk">
+        <div class="walk__row">
+          <button id="walk-toggle" class="walk-toggle" type="button" aria-pressed="false">Walk into the painting</button>
+          <p id="walk-hint" class="walk__hint"></p>
+        </div>
+        <div id="painting-chips" class="walk__row" role="group" aria-label="Choose a painting"></div>
+      </div>
+
+      <figure class="pip">
+        <img id="pip-image" alt="" decoding="async" />
+        <figcaption id="pip-caption">Original painting</figcaption>
+      </figure>
+
+      <pre id="debug-panel" class="debug-panel" aria-hidden="true" hidden></pre>
+
+      <div class="hero__loader" aria-live="polite">
+        <div class="hero__loader-bar"><span id="loader-fill"></span></div>
+        <p id="loader-text">Mixing the paint…</p>
+      </div>
+    </main>
+    <script type="module" src="/src/painting.ts"></script>
+  </body>
+</html>

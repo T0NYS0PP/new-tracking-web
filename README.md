@@ -25,8 +25,30 @@ Head tracking needs a secure context: `localhost` is fine, anything else must be
 | `npm run dev` | Vite dev server |
 | `npm run build` | Typecheck + production build into `dist/` |
 | `npm run preview` | Serve `dist/` locally |
-| `npm run assets` | Download `public/mediapipe/face_landmarker.task` and `public/splats/hero.spz` |
+| `npm run assets` | Download the face model, the sample splat, the depth model and the paintings; convert paintings to splats |
+| `npm run build:artifact` | Page fragment + file map for the claude.ai Artifact (`-- --page painting` for the painting page) |
 | `npm run typecheck` | `tsc --noEmit` |
+
+## Step inside a painting (`painting.html`)
+
+A second page turns a single painting into a walkable Gaussian splat scene:
+
+1. `scripts/painting-to-splat.mjs` runs Depth Anything V2 (small, ONNX, CPU) on the image, unprojects
+   every pixel into a thin Gaussian at its depth, adds a blurred backdrop layer behind the scene to hide
+   disocclusions, and writes an SPZ v2 file (≈4–6 MB for 650k splats).
+2. The page slides the scene toward the viewer (a "walk" you can nudge with the wheel or ↑/↓) while the
+   head-coupled window parallax from the hero keeps working. The original is shown picture-in-picture.
+
+`npm run assets` downloads the depth model and four public-domain paintings (Van Gogh, Turner, Hokusai,
+Munch) and converts them. To add your own: drop an image in `public/paintings/`, run
+
+```bash
+node scripts/painting-to-splat.mjs public/paintings/my.jpg public/splats/paintings/my.spz \
+  --model tools/models/depth_anything_v2_vits_dynamic.onnx --fov 60 --near 1.2 --far 6 --gamma 0.75 --preview my-depth.png
+```
+
+and add an entry to `src/paintings.ts`. `--gamma` < 1 pulls the mid-ground forward, `--splat-scale` closes
+cracks, `--bg 0` drops the backdrop.
 
 ## Making the scene in Unreal Engine
 

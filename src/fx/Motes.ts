@@ -8,13 +8,13 @@ export class Motes {
   readonly points: THREE.Points;
   private material: THREE.ShaderMaterial;
 
-  constructor(count = 320, color = '#ffe3b0') {
+  constructor(count = 320, color = '#ffe3b0', sizeScale = 1, private spread = 1) {
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const seeds = new Float32Array(count * 4);
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 3.2;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 2.0;
+      positions[i * 3] = (Math.random() - 0.5) * 3.2 * this.spread;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 2.0 * this.spread;
       positions[i * 3 + 2] = -0.4 - Math.random() * 3.2; // in front of the window plane, toward the scene
       seeds[i * 4] = Math.random() * Math.PI * 2;
       seeds[i * 4 + 1] = 0.3 + Math.random() * 0.9; // speed
@@ -30,10 +30,11 @@ export class Motes {
         color: { value: new THREE.Color(color) },
         pixelRatio: { value: 1 },
         intensity: { value: 1 },
+        sizeScale: { value: sizeScale },
       },
       vertexShader: /* glsl */ `
         attribute vec4 seed;
-        uniform float time, pixelRatio;
+        uniform float time, pixelRatio, sizeScale;
         varying float vAlpha;
         void main() {
           vec3 p = position;
@@ -44,7 +45,7 @@ export class Motes {
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           float twinkle = 0.55 + 0.45 * sin(time * (0.8 + seed.w * 1.6) + seed.x * 3.0);
           vAlpha = twinkle * smoothstep(-4.5, -0.6, mv.z) * smoothstep(0.1, -0.4, mv.z);
-          gl_PointSize = seed.z * 9.0 * pixelRatio / max(0.3, -mv.z);
+          gl_PointSize = seed.z * 9.0 * sizeScale * pixelRatio / max(0.3, -mv.z);
           gl_Position = projectionMatrix * mv;
         }
       `,

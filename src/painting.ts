@@ -3,7 +3,7 @@ import './styles/painting.css';
 import * as THREE from 'three';
 import type { SplatFileType } from '@sparkjsdev/spark';
 import { config, configure } from './config';
-import { DEFAULT_FX, PostFX } from './fx/PostFX';
+import { FX_PRESETS, PostFX, type FXPresetName } from './fx/PostFX';
 import { Motes } from './fx/Motes';
 import { HeroOverlay } from './ui/HeroOverlay';
 import { bootHero, checkPlatform, reportBootFailure } from './app/bootHero';
@@ -44,7 +44,7 @@ const splatType = canvas.dataset.splatType as SplatFileType | undefined;
 const splatUrlOf = (p: Painting) => p.splat + splatSuffix;
 
 let current: Painting = findPainting(selectedId());
-let fxEnabled = readFxPreference();
+let fxMode: FXPresetName | 'off' = readFxPreference();
 let walking = false;
 let walkStartedAt = 0;
 let manualOffset = 0;
@@ -60,33 +60,46 @@ if (checkPlatform(overlay)) {
       // --- Light: rays + bloom + grade in post, and motes drifting in the air in front of the scene ---
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const coarse = window.matchMedia('(pointer: coarse)').matches;
-      const fx = new PostFX(app.scene.renderer, app.scene.scene, app.scene.viewer.camera, DEFAULT_FX);
-      const motes = new Motes(coarse ? 160 : 320, current.light.color);
-      app.scene.scene.add(motes.points);
-      const applyFx = () => {
-        app.scene.setPostFX(fxEnabled ? fx : null);
-        motes.points.visible = fxEnabled && !reducedMotion;
-        fxToggle.setAttribute('aria-pressed', String(fxEnabled));
-        fxToggle.textContent = fxEnabled ? 'Light: on' : 'Light: off';
-      };
+      const fx = new PostFX(app.scene.renderer, app.scene.scene, app.scene.viewer.camera, FX_PRESETS.cinematic);
+      // Fine dust close to the viewer plus a few large, slow bokeh discs further out.
+      const motes = new Motes(coarse ? 220 : 480, current.light.color, 1.35, 1.1);
+      const bokeh = new Motes(coarse ? 14 : 28, current.light.color, 6.5, 1.3);
+      bokeh.setIntensity(0.22);
+      app.scene.scene.add(motes.points, bokeh.points);
+      const LABEL: Record<FXPresetName | 'off', string> = { cinematic: 'Light: cinematic', soft: 'Light: soft', off: 'Light: off' };
       const applyLightForPainting = (p: Painting) => {
+        if (fxMode === 'off') return;
+        const preset = FX_PRESETS[fxMode];
+        const sunColor = hexToRgb(p.light.color);
         fx.apply({
+          ...preset,
+          sun: { ...preset.sun, color: sunColor, glow: preset.sun.glow * p.light.rays, haze: preset.sun.haze * p.light.rays },
+          rays: { ...preset.rays, exposure: preset.rays.exposure * p.light.rays },
           grade: {
-            ...DEFAULT_FX.grade,
+            ...preset.grade,
             warmth: p.light.warmth,
             haze: p.light.haze,
-            hazeAmount: 0.03,
-            exposure: p.light.exposure ?? DEFAULT_FX.grade.exposure,
+            exposure: p.light.exposure ?? preset.grade.exposure,
           },
-          rays: { ...DEFAULT_FX.rays, exposure: DEFAULT_FX.rays.exposure * p.light.rays },
         });
         motes.setColor(p.light.color);
+        bokeh.setColor(p.light.color);
+        motes.setIntensity(fxMode === 'cinematic' ? 1.6 : 1.0);
+        bokeh.setIntensity(fxMode === 'cinematic' ? 0.22 : 0.08);
       };
-      applyLightForPainting(current);
+      const applyFx = () => {
+        const on = fxMode !== 'off';
+        app.scene.setPostFX(on ? fx : null);
+        motes.points.visible = on && !reducedMotion;
+        bokeh.points.visible = on && !reducedMotion && fxMode === 'cinematic';
+        fxToggle.setAttribute('aria-pressed', String(on));
+        fxToggle.textContent = LABEL[fxMode];
+        applyLightForPainting(current);
+      };
       applyFx();
       fxToggle.addEventListener('click', () => {
-        fxEnabled = !fxEnabled;
-        storeFxPreference(fxEnabled);
+        fxMode = fxMode === 'cinematic' ? 'soft' : fxMode === 'soft' ? 'off' : 'cinematic';
+        storeFxPreference(fxMode);
         applyFx();
       });
       onPaintingChange = applyLightForPainting;
@@ -95,8 +108,9 @@ if (checkPlatform(overlay)) {
       const sunWorld = new THREE.Vector3();
       app.scene.onFrame((_dt, time) => {
         motes.update(time, app.scene.renderer.getPixelRatio());
+        bokeh.update(time * 0.35, app.scene.renderer.getPixelRatio());
         const mesh = app.scene.currentSplat();
-        if (!fxEnabled || !mesh) return;
+        if (fxMode === 'off' || !mesh) return;
         // Project the painting's light source (image coords at the far plane) into screen space.
         const aspect = pipImg.naturalWidth && pipImg.naturalHeight ? pipImg.naturalWidth / pipImg.naturalHeight : 1.6;
         const tanH = Math.tan((current.fovDeg * Math.PI) / 360);
@@ -214,20 +228,26 @@ function selectedId(): string | null {
   return new URLSearchParams(location.search).get('painting');
 }
 
-function readFxPreference(): boolean {
+function readFxPreference(): FXPresetName | 'off' {
   try {
-    return localStorage.getItem('painting.fx') !== '0';
+    const v = localStorage.getItem('painting.fx');
+    return v === 'off' || v === 'soft' || v === 'cinematic' ? v : 'cinematic';
   } catch {
-    return true;
+    return 'cinematic';
   }
 }
 
-function storeFxPreference(on: boolean): void {
+function storeFxPreference(mode: FXPresetName | 'off'): void {
   try {
-    localStorage.setItem('painting.fx', on ? '1' : '0');
+    localStorage.setItem('painting.fx', mode);
   } catch {
     /* storage unavailable */
   }
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255];
 }
 
 function clamp(v: number, lo: number, hi: number): number {

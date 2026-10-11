@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SparkRenderer, SplatMesh, type SplatFileType } from '@sparkjsdev/spark';
 import { config } from '../config';
 import { ViewerCamera } from '../camera/ViewerCamera';
+import type { PostFX } from '../fx/PostFX';
 
 export interface HeroSceneEvents {
   onProgress?: (fraction: number) => void;
@@ -20,6 +21,7 @@ export class HeroScene {
   private resizeObserver: ResizeObserver;
   private frameListeners = new Set<(dt: number, time: number) => void>();
   private elapsed = 0;
+  private postFX: PostFX | null = null;
 
   static isSupported(): boolean {
     try {
@@ -82,6 +84,28 @@ export class HeroScene {
     this.events.onReady?.();
   }
 
+  /** The splat currently in the scene, if any. */
+  currentSplat(): SplatMesh | null {
+    return this.splat;
+  }
+
+  /** Route rendering through a post-processing chain (null = plain render). */
+  setPostFX(fx: PostFX | null): void {
+    this.postFX = fx;
+    if (fx) {
+      const parent = this.canvas.parentElement ?? document.body;
+      fx.setSize(Math.max(1, parent.clientWidth), Math.max(1, parent.clientHeight));
+    }
+  }
+
+  getPostFX(): PostFX | null {
+    return this.postFX;
+  }
+
+  elapsedTime(): number {
+    return this.elapsed;
+  }
+
   /** Remove and dispose the current splat (used when switching scenes). */
   unload(): void {
     if (!this.splat) return;
@@ -117,7 +141,12 @@ export class HeroScene {
   /** Render a single frame on demand (used when the loop is stopped). */
   renderOnce(dt = 0): void {
     this.viewer.update(dt);
-    this.renderer.render(this.scene, this.viewer.camera);
+    this.draw();
+  }
+
+  private draw(): void {
+    if (this.postFX) this.postFX.render(this.elapsed);
+    else this.renderer.render(this.scene, this.viewer.camera);
   }
 
   private frame(): void {
@@ -126,7 +155,7 @@ export class HeroScene {
     this.elapsed += dt;
     for (const l of this.frameListeners) l(dt, this.elapsed);
     this.viewer.update(dt);
-    this.renderer.render(this.scene, this.viewer.camera);
+    this.draw();
   }
 
   private resize(): void {
@@ -135,5 +164,6 @@ export class HeroScene {
     const h = Math.max(1, parent.clientHeight);
     this.renderer.setSize(w, h, false);
     this.viewer.resize(w, h);
+    this.postFX?.setSize(w, h);
   }
 }

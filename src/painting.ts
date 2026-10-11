@@ -1,7 +1,10 @@
 import './styles/hero.css';
 import './styles/painting.css';
+import * as THREE from 'three';
 import type { SplatFileType } from '@sparkjsdev/spark';
 import { config, configure } from './config';
+import { DEFAULT_FX, PostFX } from './fx/PostFX';
+import { Motes } from './fx/Motes';
 import { HeroOverlay } from './ui/HeroOverlay';
 import { bootHero, checkPlatform, reportBootFailure } from './app/bootHero';
 import { PAINTINGS, findPainting, type Painting } from './paintings';
@@ -33,6 +36,7 @@ const pipCaption = must<HTMLElement>('#pip-caption');
 const chips = must<HTMLElement>('#painting-chips');
 const walkToggle = must<HTMLButtonElement>('#walk-toggle');
 const walkHint = must<HTMLElement>('#walk-hint');
+const fxToggle = must<HTMLButtonElement>('#fx-toggle');
 
 // Hosts that cannot serve .spz publish the same bytes under another name (see scripts/build-artifact.mjs).
 const splatSuffix = canvas.dataset.splatSuffix ?? '';
@@ -40,6 +44,7 @@ const splatType = canvas.dataset.splatType as SplatFileType | undefined;
 const splatUrlOf = (p: Painting) => p.splat + splatSuffix;
 
 let current: Painting = findPainting(selectedId());
+let fxEnabled = readFxPreference();
 let walking = false;
 let walkStartedAt = 0;
 let manualOffset = 0;
@@ -52,6 +57,51 @@ applyPaintingMeta(current);
 if (checkPlatform(overlay)) {
   bootHero({ canvas, overlay, splatUrl: splatUrlOf(current), splatType })
     .then((app) => {
+      // --- Light: rays + bloom + grade in post, and motes drifting in the air in front of the scene ---
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const coarse = window.matchMedia('(pointer: coarse)').matches;
+      const fx = new PostFX(app.scene.renderer, app.scene.scene, app.scene.viewer.camera, DEFAULT_FX);
+      const motes = new Motes(coarse ? 160 : 320, current.light.color);
+      app.scene.scene.add(motes.points);
+      const applyFx = () => {
+        app.scene.setPostFX(fxEnabled ? fx : null);
+        motes.points.visible = fxEnabled && !reducedMotion;
+        fxToggle.setAttribute('aria-pressed', String(fxEnabled));
+        fxToggle.textContent = fxEnabled ? 'Light: on' : 'Light: off';
+      };
+      const applyLightForPainting = (p: Painting) => {
+        fx.apply({
+          grade: { ...DEFAULT_FX.grade, warmth: p.light.warmth, haze: p.light.haze, hazeAmount: 0.03 },
+          rays: { ...DEFAULT_FX.rays, exposure: DEFAULT_FX.rays.exposure * p.light.rays },
+        });
+        motes.setColor(p.light.color);
+      };
+      applyLightForPainting(current);
+      applyFx();
+      fxToggle.addEventListener('click', () => {
+        fxEnabled = !fxEnabled;
+        storeFxPreference(fxEnabled);
+        applyFx();
+      });
+      onPaintingChange = applyLightForPainting;
+
+      const sunLocal = new THREE.Vector3();
+      const sunWorld = new THREE.Vector3();
+      app.scene.onFrame((_dt, time) => {
+        motes.update(time, app.scene.renderer.getPixelRatio());
+        const mesh = app.scene.currentSplat();
+        if (!fxEnabled || !mesh) return;
+        // Project the painting's light source (image coords at the far plane) into screen space.
+        const aspect = pipImg.naturalWidth && pipImg.naturalHeight ? pipImg.naturalWidth / pipImg.naturalHeight : 1.6;
+        const tanH = Math.tan((current.fovDeg * Math.PI) / 360);
+        const zf = 6.5;
+        sunLocal.set((current.light.x - 0.5) * 2 * tanH * zf, (-(current.light.y - 0.5) * 2 * tanH * zf) / aspect, -zf);
+        mesh.localToWorld(sunWorld.copy(sunLocal));
+        sunWorld.project(app.scene.viewer.camera);
+        const behind = sunWorld.z > 1;
+        fx.setLight({ x: (sunWorld.x + 1) / 2, y: (sunWorld.y + 1) / 2 }, behind ? 0 : 1);
+      });
+
       // --- Walk: ease the scene toward the viewer and back, with wheel / keys nudging the depth ---
       app.scene.onFrame((_dt, time) => {
         let auto = 0;
@@ -101,9 +151,12 @@ if (checkPlatform(overlay)) {
     .catch((err: unknown) => reportBootFailure(overlay, err));
 }
 
+let onPaintingChange: ((p: Painting) => void) | null = null;
+
 async function switchPainting(next: Painting, app: Awaited<ReturnType<typeof bootHero>>): Promise<void> {
   current = next;
   applyPaintingMeta(next);
+  onPaintingChange?.(next);
   renderChips();
   setWalking(false, app);
   manualOffset = 0;
@@ -153,6 +206,22 @@ function selectedId(): string | null {
   const hash = location.hash.replace(/^#/, '');
   if (hash && PAINTINGS.some((p) => p.id === hash)) return hash;
   return new URLSearchParams(location.search).get('painting');
+}
+
+function readFxPreference(): boolean {
+  try {
+    return localStorage.getItem('painting.fx') !== '0';
+  } catch {
+    return true;
+  }
+}
+
+function storeFxPreference(on: boolean): void {
+  try {
+    localStorage.setItem('painting.fx', on ? '1' : '0');
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 function clamp(v: number, lo: number, hi: number): number {

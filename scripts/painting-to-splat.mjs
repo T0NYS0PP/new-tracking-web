@@ -14,6 +14,8 @@
 //   --edge <g>          drop pixels whose depth gradient exceeds this (normalised/px);
 //                       removes the smeared ramp at silhouettes                            [0.025]
 //   --bg-extend <r>     backdrop extends this far beyond the painting (mirrored), 1 = none  [1.4]
+//   --haze <h>          aerial perspective: blend far splats toward a haze colour by up to h [0.18]
+//   --haze-color <hex>  haze colour; default derived from the painting's own far region
 //   --thin <t>          splat thickness along the view axis relative to its radius        [0.35]
 //   --opacity <a>       splat opacity 0-1                                                 [0.97]
 //   --bg <0|1>          add a blurred backdrop layer behind the scene to hide holes       [1]
@@ -49,6 +51,8 @@ const cfg = {
   splatScale: Number(opt('splat-scale', 1.5)),
   edge: Number(opt('edge', 0.025)),
   bgExtend: Number(opt('bg-extend', 1.4)),
+  haze: Number(opt('haze', 0.18)),
+  hazeColor: opt('haze-color', null),
   thin: Number(opt('thin', 0.35)),
   opacity: Number(opt('opacity', 0.97)),
   bg: Number(opt('bg', 1)) !== 0,
@@ -148,6 +152,26 @@ for (let v = 1; v < H - 1; v++) {
 }
 let dropped = 0;
 
+// Haze colour: the painting's own far region, lifted toward white (aerial perspective).
+let hazeRGB = [200, 200, 200];
+if (cfg.hazeColor) {
+  const hex = cfg.hazeColor.replace('#', '');
+  hazeRGB = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+} else {
+  let n = 0;
+  const acc = [0, 0, 0];
+  for (let i = 0; i < W * H; i++) {
+    if (depthN[i] < 0.25) {
+      acc[0] += rgb[i * 3];
+      acc[1] += rgb[i * 3 + 1];
+      acc[2] += rgb[i * 3 + 2];
+      n++;
+    }
+  }
+  if (n) hazeRGB = acc.map((v) => Math.round(v / n * 0.55 + 255 * 0.45));
+}
+const hazeAt = (d) => cfg.haze * Math.pow(1 - d, 2.2); // d = normalised disparity, 0 = farthest
+
 const splats = []; // {x,y,z,sx,sy,sz,r,g,b,a}
 let zMin = Infinity;
 let zMax = 0;
@@ -163,6 +187,7 @@ for (let v = 0; v < H; v++) {
     zMax = Math.max(zMax, z);
     const px = z / f; // world size of one pixel at this depth
     const s = px * cfg.splatScale;
+    const h = hazeAt(depthN[i]);
     splats.push({
       x: ((u + 0.5 - cx) / f) * z,
       y: (-(v + 0.5 - cy) / f) * z,
@@ -170,9 +195,9 @@ for (let v = 0; v < H; v++) {
       sx: s,
       sy: s,
       sz: s * cfg.thin,
-      r: rgb[i * 3],
-      g: rgb[i * 3 + 1],
-      b: rgb[i * 3 + 2],
+      r: rgb[i * 3] * (1 - h) + hazeRGB[0] * h,
+      g: rgb[i * 3 + 1] * (1 - h) + hazeRGB[1] * h,
+      b: rgb[i * 3 + 2] * (1 - h) + hazeRGB[2] * h,
       a: cfg.opacity,
     });
   }
@@ -278,9 +303,9 @@ if (cfg.bg) {
         sx: s,
         sy: s,
         sz: s * 0.2,
-        r: Math.round(Math.min(255, Math.max(0, soft[i * 3]))),
-        g: Math.round(Math.min(255, Math.max(0, soft[i * 3 + 1]))),
-        b: Math.round(Math.min(255, Math.max(0, soft[i * 3 + 2]))),
+        r: Math.round(Math.min(255, Math.max(0, soft[i * 3] * (1 - cfg.haze) + hazeRGB[0] * cfg.haze))),
+        g: Math.round(Math.min(255, Math.max(0, soft[i * 3 + 1] * (1 - cfg.haze) + hazeRGB[1] * cfg.haze))),
+        b: Math.round(Math.min(255, Math.max(0, soft[i * 3 + 2] * (1 - cfg.haze) + hazeRGB[2] * cfg.haze))),
         a: 1,
       });
       bgCount++;
@@ -334,7 +359,7 @@ if (o !== buf.length) throw new Error(`encode size mismatch ${o} != ${buf.length
 const gz = gzipSync(buf, { level: 9 });
 writeFileSync(output, gz);
 console.log(
-  `[spz] ${n} splats (${mainCount} image + ${bgCount} backdrop, ${dropped} edge pixels dropped), depth ${zMin.toFixed(2)}..${zMax.toFixed(2)}, ` +
+  `[spz] ${n} splats (${mainCount} image + ${bgCount} backdrop, ${dropped} edge pixels dropped), depth ${zMin.toFixed(2)}..${zMax.toFixed(2)}, haze rgb(${hazeRGB.join(',')}) x${cfg.haze}, ` +
     `${(gz.length / 1e6).toFixed(1)} MB -> ${output}`,
 );
 

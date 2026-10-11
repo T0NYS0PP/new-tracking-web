@@ -33,22 +33,22 @@ const PAINTINGS = [
   {
     id: 'starry-night',
     url: 'https://raw.githubusercontent.com/jcjohnson/neural-style/master/examples/inputs/starry_night.jpg',
-    args: ['--fov', '66', '--near', '1.8', '--far', '7', '--gamma', '0.7'],
+    args: ['--fov', '66', '--near', '1.8', '--far', '7', '--gamma', '0.7', '--haze', '0.12'],
   },
   {
     id: 'shipwreck',
     url: 'https://raw.githubusercontent.com/jcjohnson/neural-style/master/examples/inputs/shipwreck.jpg',
-    args: ['--fov', '66', '--near', '1.8', '--far', '8', '--gamma', '0.8'],
+    args: ['--fov', '66', '--near', '1.8', '--far', '8', '--gamma', '0.8', '--haze', '0.22'],
   },
   {
     id: 'great-wave',
     url: 'https://raw.githubusercontent.com/jcjohnson/fast-neural-style/master/images/styles/wave_crop.jpg',
-    args: ['--fov', '66', '--near', '1.8', '--far', '8', '--gamma', '0.8'],
+    args: ['--fov', '66', '--near', '1.8', '--far', '8', '--gamma', '0.8', '--haze', '0.16'],
   },
   {
     id: 'the-scream',
     url: 'https://raw.githubusercontent.com/jcjohnson/neural-style/master/examples/inputs/the_scream.jpg',
-    args: ['--fov', '66', '--near', '1.8', '--far', '7', '--gamma', '0.75'],
+    args: ['--fov', '66', '--near', '1.8', '--far', '7', '--gamma', '0.75', '--haze', '0.14'],
   },
 ];
 for (const p of PAINTINGS) ASSETS.push({ url: p.url, dest: `public/paintings/${p.id}.jpg` });

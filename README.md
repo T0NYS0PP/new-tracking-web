@@ -48,7 +48,14 @@ node scripts/painting-to-splat.mjs public/paintings/my.jpg public/splats/paintin
 ```
 
 and add an entry to `src/paintings.ts`. `--gamma` < 1 pulls the mid-ground forward, `--splat-scale` closes
-cracks, `--bg 0` drops the backdrop.
+cracks, `--bg 0` drops the backdrop, `--haze` bakes aerial perspective into the far splats.
+
+**Light.** The page renders through `src/fx/PostFX.ts` (three.js EffectComposer): screen-space light rays
+from the painting's light source (set per painting in `src/paintings.ts` as image coordinates), a soft bloom,
+and a grade pass (exposure, contrast, warmth, vignette, grain, shadow haze). `src/fx/Motes.ts` adds drifting
+light particles in the air in front of the scene. The "Light" button toggles all of it; the choice is
+remembered per browser. Defaults live in `DEFAULT_FX`; each painting overrides warmth, haze colour and ray
+strength.
 
 ## Making the scene in Unreal Engine
 

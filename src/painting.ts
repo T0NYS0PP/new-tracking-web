@@ -71,7 +71,13 @@ if (checkPlatform(overlay)) {
       };
       const applyLightForPainting = (p: Painting) => {
         fx.apply({
-          grade: { ...DEFAULT_FX.grade, warmth: p.light.warmth, haze: p.light.haze, hazeAmount: 0.03 },
+          grade: {
+            ...DEFAULT_FX.grade,
+            warmth: p.light.warmth,
+            haze: p.light.haze,
+            hazeAmount: 0.03,
+            exposure: p.light.exposure ?? DEFAULT_FX.grade.exposure,
+          },
           rays: { ...DEFAULT_FX.rays, exposure: DEFAULT_FX.rays.exposure * p.light.rays },
         });
         motes.setColor(p.light.color);

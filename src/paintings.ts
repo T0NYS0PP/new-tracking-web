@@ -12,7 +12,7 @@ export interface Painting {
   /** Horizontal FOV the splat was converted with (scripts/download-assets.mjs). */
   fovDeg: number;
   /** Light source in image coordinates (0..1 from the top-left) and how the frame is graded. */
-  light: { x: number; y: number; rays: number; color: string; warmth: number; haze: [number, number, number] };
+  light: { x: number; y: number; rays: number; color: string; warmth: number; haze: [number, number, number]; exposure?: number };
 }
 
 /** Public-domain paintings converted with scripts/painting-to-splat.mjs (see scripts/download-assets.mjs). */
@@ -48,7 +48,7 @@ export const PAINTINGS: Painting[] = [
     image: assetUrl('paintings/great-wave.jpg'),
     walkDepth: 2.2,
     fovDeg: 66,
-    light: { x: 0.55, y: 0.12, rays: 0.6, color: '#fff2d6', warmth: 0.1, haze: [0.82, 0.8, 0.72] },
+    light: { x: 0.55, y: 0.12, rays: 0.6, color: '#fff2d6', warmth: 0.1, haze: [0.82, 0.8, 0.72], exposure: 1.04 },
   },
   {
     id: 'the-scream',
@@ -59,7 +59,7 @@ export const PAINTINGS: Painting[] = [
     image: assetUrl('paintings/the-scream.jpg'),
     walkDepth: 1.8,
     fovDeg: 66,
-    light: { x: 0.5, y: 0.08, rays: 1.0, color: '#ffc28a', warmth: 0.45, haze: [0.85, 0.6, 0.4] },
+    light: { x: 0.5, y: 0.08, rays: 1.0, color: '#ffc28a', warmth: 0.45, haze: [0.85, 0.6, 0.4], exposure: 1.14 },
   },
 ];
 
